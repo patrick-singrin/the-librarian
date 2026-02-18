@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { RouterProvider } from 'react-aria-components'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import { AppShell } from './components/layout/AppShell'
 import { HealthDashboard } from './components/health/HealthDashboard'
 import { SyncPage } from './components/sync/SyncPage'
@@ -13,8 +15,14 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 10000,
+      gcTime: Infinity,
     },
   },
+})
+
+const persister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key: 'librarian-query-cache',
 })
 
 function InnerApp() {
@@ -37,10 +45,10 @@ function InnerApp() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
       <BrowserRouter>
         <InnerApp />
       </BrowserRouter>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   )
 }
