@@ -21,11 +21,6 @@ export const api = {
       body: JSON.stringify({ query, space_id: spaceId }),
     }),
 
-  ragStats: (spaceId?: string) => {
-    const qs = spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''
-    return request<import('../types/api.js').RagStats>(`/api/rag/stats${qs}`)
-  },
-
   ragCheckNew: (spaceId?: string) => {
     const qs = spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''
     return request<import('../types/api.js').CheckNewResponse>(`/api/rag/check-new${qs}`)

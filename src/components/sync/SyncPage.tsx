@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ProgressBar } from 'react-aria-components'
-import { useSpaces, useSyncStats, useCheckNew, useSync } from '../../hooks/useSyncStatus'
+import { useSpaces, useCheckNew, useSync } from '../../hooks/useSyncStatus'
 import { useSpaceDocuments } from '../../hooks/useSpaceDocuments'
 import { Badge, Button, Tile, Indicator, Card, Select, SelectItem } from '../ui'
 import type { TileBadge } from '../ui'
@@ -25,7 +25,6 @@ export function SyncPage() {
   const spaceId = selectedSpace === ALL_SPACES_KEY ? undefined : selectedSpace
 
   const spaces = useSpaces()
-  const stats = useSyncStats(spaceId)
   const checkNew = useCheckNew(spaceId)
   const sync = useSync()
   const rag = useServiceHealth('rag')
@@ -43,8 +42,8 @@ export function SyncPage() {
       ? Math.round((totalIndexed / totalDocs) * 100)
       : 0
 
-  const embeddingModel = stats.data?.embedding_model ?? null
-  const llmModel = stats.data?.llm_model ?? null
+  const embeddingModel = checkNew.data?.embedding_model ?? null
+  const llmModel = checkNew.data?.llm_model ?? null
   const embeddingAvailable = checkNew.data?.embedding_available ?? false
   const llmAvailable = checkNew.data?.llm_available ?? false
 
@@ -52,7 +51,7 @@ export function SyncPage() {
 
   const newDocs = checkNew.data?.new_documents ?? []
   const isFullySynced = checkNew.data != null && newCount === 0
-  const loading = stats.isLoading || checkNew.isLoading
+  const loading = checkNew.isLoading
   const spacesList = spaces.data ?? []
   const hasSpaces = spacesList.length > 0
 
@@ -138,14 +137,14 @@ export function SyncPage() {
         </div>
       )}
 
-      {stats.error && (
+      {checkNew.error && (
         rag.isStarting ? (
           <div role="status" className="rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
             {rag.message}
           </div>
         ) : (
           <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
-            Unable to load stats: {stats.error.message}
+            Unable to load stats: {checkNew.error.message}
           </div>
         )
       )}

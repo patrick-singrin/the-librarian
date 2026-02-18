@@ -42,7 +42,7 @@ export function Tile({
 }: TileProps) {
   return (
     <article
-      className={`rounded-md border border-base-subtle-border-default bg-base-background-default p-4 ${className}`}
+      className={`rounded-md border border-base-subtle-border-default bg-base-background-default p-4 shadow-xs ${className}`}
     >
       {/* ── Head row ── */}
       <header className="flex h-6 items-center justify-between">

@@ -33,23 +33,6 @@ export interface AskResponse {
   model_used: string
 }
 
-export interface RagStats {
-  vector_database?: {
-    collection_name?: string
-    vectors_count?: number
-    points_count?: number
-    segments_count?: number
-    status?: string
-    error?: string
-  }
-  paperless_documents: number | 'unknown'
-  embedding_model: string
-  llm_model: string
-  space_id?: string | null
-  space_documents?: number
-  space_chunks?: number
-}
-
 export interface CheckNewResponse {
   new_count: number
   new_documents: Array<{ id: number; title: string; created: string; file_type: string; spaces: string[] }>
@@ -58,6 +41,8 @@ export interface CheckNewResponse {
   unassigned_count: number
   embedding_available: boolean
   llm_available: boolean
+  embedding_model?: string | null
+  llm_model?: string | null
   space_id?: string | null
 }
 

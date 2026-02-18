@@ -6,6 +6,7 @@ export function useSettings() {
   return useQuery({
     queryKey: ['settings'],
     queryFn: api.getSettings,
+    refetchInterval: 300_000, // settings rarely change externally
   })
 }
 
@@ -16,6 +17,8 @@ export function useUpdateSettings() {
     mutationFn: (settings: Partial<Settings>) => api.updateSettings(settings),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
+      // Tag setting affects which documents are considered "pending"
+      queryClient.invalidateQueries({ queryKey: ['meta-pending'] })
     },
   })
 }

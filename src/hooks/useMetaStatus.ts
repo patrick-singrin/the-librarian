@@ -5,6 +5,7 @@ export function useMetaPending() {
   return useQuery({
     queryKey: ['meta-pending'],
     queryFn: api.metaPending,
+    refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   })
 }

@@ -1,6 +1,7 @@
 import { type ComponentType } from 'react'
 import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
 import { Tile, type TileBadge } from './Tile'
+import { formatRelativeTime } from '../../utils/relativeTime'
 
 interface KpiTileProps {
   /** Tile heading */
@@ -30,7 +31,7 @@ function formatValue(value: number | string | null | undefined): string {
  * KpiTile — Tile + .slot-element-kpi slot.
  *
  * Composes the base Tile with a centered KPI value display.
- * "Last updated" is handled by the Tile footer via updatedAt.
+ * "Last Update" row lives inside the grey slot area (matching Figma).
  */
 export function KpiTile({
   title,
@@ -43,14 +44,25 @@ export function KpiTile({
   className = '',
 }: KpiTileProps) {
   return (
-    <Tile title={title} icon={icon} badge={badge} updatedAt={updatedAt} className={className}>
-      <div className="flex flex-col items-center rounded-lg bg-base-subtle-background-default px-2 py-2">
-        <span
-          className="pt-6 pb-4 text-[30px] font-semibold leading-9 text-base-foreground-default"
-          title={description}
-        >
-          {loading && value == null ? '\u2026' : formatValue(value)}
-        </span>
+    <Tile title={title} icon={icon} badge={badge} className={className}>
+      <div className="flex flex-col items-start gap-2 rounded-md bg-base-subtle-background-default p-2">
+        {/* Value */}
+        <div className="flex w-full items-center justify-center px-0 pt-6 pb-4">
+          <span
+            className="text-center text-[30px] font-semibold leading-9 text-base-foreground-default"
+            title={description}
+          >
+            {loading && value == null ? '\u2026' : formatValue(value)}
+          </span>
+        </div>
+
+        {/* Last Update row */}
+        {updatedAt != null && (
+          <div className="flex w-full items-center justify-center gap-1 text-xs text-base-subtle-foreground-default">
+            <span className="font-light">Last Update:</span>
+            <span className="font-medium">{formatRelativeTime(updatedAt)}</span>
+          </div>
+        )}
       </div>
     </Tile>
   )

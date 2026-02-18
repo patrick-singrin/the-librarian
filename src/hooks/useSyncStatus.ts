@@ -11,15 +11,6 @@ export function useSpaces() {
   })
 }
 
-export function useSyncStats(spaceId?: string) {
-  return useQuery({
-    queryKey: ['rag-stats', spaceId],
-    queryFn: () => api.ragStats(spaceId),
-    refetchInterval: 60_000,
-    placeholderData: keepPreviousData,
-  })
-}
-
 export function useCheckNew(spaceId?: string) {
   return useQuery({
     queryKey: ['rag-check-new', spaceId],
@@ -35,8 +26,8 @@ export function useSync() {
     mutationFn: ({ docIds, spaceId }: { docIds?: number[]; spaceId?: string } = {}) =>
       api.ragSync(docIds, spaceId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rag-stats'] })
       queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
+      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
     },
   })
 }
@@ -48,6 +39,7 @@ export function useCreateSpace() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rag-spaces'] })
       queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
+      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
     },
   })
 }
@@ -60,6 +52,7 @@ export function useUpdateSpace() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rag-spaces'] })
       queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
+      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
     },
   })
 }
@@ -71,6 +64,7 @@ export function useDeleteSpace() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rag-spaces'] })
       queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
+      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
     },
   })
 }

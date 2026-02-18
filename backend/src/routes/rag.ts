@@ -25,8 +25,20 @@ ragRouter.get('/stats', async (req, res) => {
 ragRouter.get('/check-new', async (req, res) => {
   try {
     const spaceId = req.query.space_id as string | undefined
-    const result = await ragCheckNew(spaceId)
-    res.json(result)
+    // Fetch check-new + stats in parallel so the frontend needs only one query
+    const [checkNewResult, statsResult] = await Promise.allSettled([
+      ragCheckNew(spaceId),
+      ragStats(spaceId),
+    ])
+    if (checkNewResult.status === 'rejected') throw checkNewResult.reason
+    const data = checkNewResult.value as Record<string, unknown>
+    // Enrich with model names from stats (if available)
+    if (statsResult.status === 'fulfilled') {
+      const stats = statsResult.value as Record<string, unknown>
+      data.embedding_model = stats.embedding_model ?? null
+      data.llm_model = stats.llm_model ?? null
+    }
+    res.json(data)
   } catch (e) {
     res.status(502).json({ error: (e as Error).message })
   }

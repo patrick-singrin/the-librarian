@@ -6,6 +6,7 @@ export function useSpaceDocuments(spaceId: string | undefined) {
     queryKey: ['rag-indexed-documents', spaceId],
     queryFn: () => api.ragIndexedDocuments(spaceId!),
     enabled: !!spaceId,
+    refetchInterval: 120_000,
     placeholderData: keepPreviousData,
   })
 }
