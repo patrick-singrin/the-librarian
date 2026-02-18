@@ -30,22 +30,22 @@ A self-hosted AI companion for [Paperless-NGX](https://docs.paperless-ngx.com/) 
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Frontend (React 19 + TypeScript)           │
+│  Frontend (Vite + React 19 + TypeScript)    │
 │  React Aria Components · Tailwind CSS v4    │
 └──────────────────┬──────────────────────────┘
                    │ /api proxy
 ┌──────────────────▼──────────────────────────┐
-│  Backend (Node.js Express)                  │
-│  Thin API gateway — routes to services      │
+│  Backend (Node.js Express, port 3001)       │
+│  API gateway — no business logic            │
 └───┬──────────┬──────────┬───────────────────┘
     │          │          │
     ▼          ▼          ▼
 Paperless   RAG API    Meta Enrichment
  (NAS)     (FastAPI)   (Python script)
-             │
-        ┌────┴────┐
-        ▼         ▼
-     Qdrant    LM Studio
+             │               │
+        ┌────┴────┐          │
+        ▼         ▼          │
+     Qdrant    LM Studio ◄───┘
      (NAS)    (localhost)
 ```
 
@@ -54,7 +54,7 @@ Paperless   RAG API    Meta Enrichment
 | Frontend | Vite, React 19, TypeScript, Tailwind v4, React Aria | Web dashboard |
 | Backend | Node.js, Express | API gateway, no business logic |
 | RAG API | FastAPI, Python | Embedding, retrieval, Q&A with Qdrant |
-| Meta Enrichment | Python | LLM-based document metadata extraction |
+| Meta Enrichment | Python | LLM-based document metadata extraction via LM Studio |
 | Qdrant | Vector DB | Stores document embeddings |
 | LM Studio | Local LLM server | Provides the language model (any OpenAI-compatible API works) |
 
