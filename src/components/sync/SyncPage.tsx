@@ -13,7 +13,6 @@ import {
   ArrowsClockwise,
   Info,
   Database,
-  Fire,
 } from '@phosphor-icons/react'
 import { useServiceHealth } from '../../hooks/useServiceHealth'
 import { SpacesTile } from './SpacesTile'
@@ -115,12 +114,12 @@ export function SyncPage() {
             <Button
               variant="base-outline"
               size="sm"
-              iconLeft={Fire}
+              iconLeft={Info}
               onPress={() => setShowModelInfo(!showModelInfo)}
               className="shrink-0"
-            >
-              {showModelInfo ? 'Hide' : 'Why?'}
-            </Button>
+              aria-label="More info about embedding model"
+              aria-expanded={showModelInfo}
+            />
           </div>
           {showModelInfo && (
             <div className="rounded border border-primary-subtle-border-default bg-base-background-default px-3 py-2 text-xs leading-relaxed text-base-subtle-foreground-default">
