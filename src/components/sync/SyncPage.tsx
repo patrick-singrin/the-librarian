@@ -13,6 +13,7 @@ import {
   ArrowsClockwise,
   Info,
   Database,
+  Fire,
 } from '@phosphor-icons/react'
 import { useServiceHealth } from '../../hooks/useServiceHealth'
 import { SpacesTile } from './SpacesTile'
@@ -21,6 +22,7 @@ const ALL_SPACES_KEY = '__all__'
 
 export function SyncPage() {
   const [selectedSpace, setSelectedSpace] = useState<string>(ALL_SPACES_KEY)
+  const [showModelInfo, setShowModelInfo] = useState(false)
   const spaceId = selectedSpace === ALL_SPACES_KEY ? undefined : selectedSpace
 
   const spaces = useSpaces()
@@ -97,18 +99,43 @@ export function SyncPage() {
 
       {/* Embedding model requirement */}
       {embeddingModel && (
-        <div className="flex items-start gap-2 rounded-lg border border-primary-subtle-border-default bg-primary-subtle-background-default px-3 py-2.5">
-          <Database size={16} weight="regular" className="mt-px shrink-0 text-primary-foreground-default" />
-          <span className="text-xs text-base-subtle-foreground-default">
-            <span className="font-medium text-base-foreground-default">Required embedding model:</span>
-            {' '}{embeddingModel}
-            {' — '}
-            <Indicator variant={embeddingAvailable ? 'success' : 'error'} size="xs" className="inline-block align-middle" />
-            {' '}
-            <span className={embeddingAvailable ? 'text-success-foreground-default' : 'text-error-foreground-default'}>
-              {embeddingAvailable ? 'Available' : 'Not available'}
+        <div className="flex flex-col gap-2 rounded-lg border border-primary-subtle-border-default bg-primary-subtle-background-default px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <Database size={16} weight="regular" className="shrink-0 text-primary-foreground-default" />
+            <span className="flex-1 text-xs text-base-subtle-foreground-default">
+              <span className="font-medium text-base-foreground-default">Required embedding model:</span>
+              {' '}{embeddingModel}
+              {' — '}
+              <Indicator variant={embeddingAvailable ? 'success' : 'error'} size="xs" className="inline-block align-middle" />
+              {' '}
+              <span className={embeddingAvailable ? 'text-success-foreground-default' : 'text-error-foreground-default'}>
+                {embeddingAvailable ? 'Available' : 'Not available'}
+              </span>
             </span>
-          </span>
+            <Button
+              variant="base-outline"
+              size="sm"
+              iconLeft={Fire}
+              onPress={() => setShowModelInfo(!showModelInfo)}
+              className="shrink-0"
+            >
+              {showModelInfo ? 'Hide' : 'Why?'}
+            </Button>
+          </div>
+          {showModelInfo && (
+            <div className="rounded border border-primary-subtle-border-default bg-base-background-default px-3 py-2 text-xs leading-relaxed text-base-subtle-foreground-default">
+              <p>
+                The embedding model converts documents into numeric vectors for semantic search.
+                <span className="font-medium text-base-foreground-default"> You must use the same model for ingesting and searching</span>
+                {' '}— vectors from different models are mathematically incompatible.
+              </p>
+              <p className="mt-1.5">
+                Currently this model is loaded locally by the RAG API via HuggingFace (SentenceTransformer).
+                It is <span className="font-medium text-base-foreground-default">not</span> provided by LM Studio.
+                Changing the model requires re-ingesting all documents in every space.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
