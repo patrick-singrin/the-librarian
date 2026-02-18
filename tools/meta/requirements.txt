@@ -1,0 +1,13 @@
+# Python Dependencies for Paperless Metadata Enrichment
+# ======================================================
+
+# Core dependencies
+httpx>=0.27.0            # Async HTTP client
+pyyaml>=6.0              # YAML configuration
+python-dateutil>=2.8.2   # Date parsing
+
+# Logging (built-in, no need to install)
+# asyncio (built-in)
+# json (built-in)
+# pathlib (built-in)
+# dataclasses (built-in for Python 3.7+)

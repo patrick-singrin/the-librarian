@@ -1,0 +1,257 @@
+@import "tailwindcss";
+@plugin "tailwindcss-react-aria-components";
+
+@theme static {
+  --font-sans: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-serif: "Literata", Georgia, serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+
+  /* ── base (→ slate) ── */
+  --color-base-background-default: var(--color-white);
+  --color-base-background-hover: var(--color-slate-100);
+  --color-base-background-active: var(--color-gray-200);
+  --color-base-background-disabled: var(--color-white);
+  --color-base-foreground-default: var(--color-slate-950);
+  --color-base-foreground-hover: var(--color-slate-950);
+  --color-base-foreground-active: var(--color-gray-950);
+  --color-base-foreground-disabled: var(--color-slate-300);
+  --color-base-subtle-background-default: var(--color-slate-100);
+  --color-base-subtle-background-hover: var(--color-slate-200);
+  --color-base-subtle-background-active: var(--color-gray-300);
+  --color-base-subtle-background-disabled: var(--color-white);
+  --color-base-subtle-foreground-default: var(--color-slate-700);
+  --color-base-subtle-foreground-hover: var(--color-slate-700);
+  --color-base-subtle-foreground-active: var(--color-gray-700);
+  --color-base-subtle-foreground-disabled: var(--color-slate-300);
+  --color-base-p-background-default: var(--color-slate-950);
+  --color-base-p-background-hover: var(--color-slate-800);
+  --color-base-p-background-active: var(--color-gray-700);
+  --color-base-p-background-disabled: var(--color-slate-300);
+  --color-base-p-foreground-default: var(--color-white);
+  --color-base-p-foreground-hover: var(--color-white);
+  --color-base-p-foreground-active: var(--color-white);
+  --color-base-p-foreground-disabled: var(--color-white);
+  --color-base-border-default: var(--color-slate-400);
+  --color-base-border-hover: var(--color-slate-800);
+  --color-base-border-active: var(--color-gray-700);
+  --color-base-border-disabled: var(--color-slate-300);
+  --color-base-subtle-border-default: var(--color-slate-300);
+  --color-base-subtle-border-hover: var(--color-slate-800);
+  --color-base-subtle-border-active: var(--color-gray-700);
+  --color-base-subtle-border-disabled: var(--color-slate-300);
+
+  /* ── primary (→ blue) ── */
+  --color-primary-background-default: var(--color-white);
+  --color-primary-background-hover: var(--color-blue-100);
+  --color-primary-background-active: var(--color-blue-200);
+  --color-primary-background-disabled: var(--color-white);
+  --color-primary-foreground-default: var(--color-blue-600);
+  --color-primary-foreground-hover: var(--color-blue-700);
+  --color-primary-foreground-active: var(--color-blue-800);
+  --color-primary-foreground-disabled: var(--color-slate-300);
+  --color-primary-subtle-background-default: var(--color-blue-100);
+  --color-primary-subtle-background-hover: var(--color-blue-200);
+  --color-primary-subtle-background-active: var(--color-blue-300);
+  --color-primary-subtle-background-disabled: var(--color-white);
+  --color-primary-subtle-foreground-default: var(--color-blue-700);
+  --color-primary-subtle-foreground-hover: var(--color-blue-700);
+  --color-primary-subtle-foreground-active: var(--color-blue-700);
+  --color-primary-subtle-foreground-disabled: var(--color-slate-300);
+  --color-primary-p-background-default: var(--color-blue-600);
+  --color-primary-p-background-hover: var(--color-blue-700);
+  --color-primary-p-background-active: var(--color-blue-800);
+  --color-primary-p-background-disabled: var(--color-slate-300);
+  --color-primary-p-foreground-default: var(--color-white);
+  --color-primary-p-foreground-hover: var(--color-white);
+  --color-primary-p-foreground-active: var(--color-white);
+  --color-primary-p-foreground-disabled: var(--color-white);
+  --color-primary-border-default: var(--color-blue-400);
+  --color-primary-border-hover: var(--color-blue-800);
+  --color-primary-border-active: var(--color-blue-700);
+  --color-primary-border-disabled: var(--color-slate-300);
+  --color-primary-subtle-border-default: var(--color-blue-300);
+  --color-primary-subtle-border-hover: var(--color-blue-800);
+  --color-primary-subtle-border-active: var(--color-blue-700);
+  --color-primary-subtle-border-disabled: var(--color-slate-300);
+
+  /* ── success (→ green) ── */
+  --color-success-background-default: var(--color-white);
+  --color-success-background-hover: var(--color-green-100);
+  --color-success-background-active: var(--color-green-200);
+  --color-success-background-disabled: var(--color-white);
+  --color-success-foreground-default: var(--color-green-600);
+  --color-success-foreground-hover: var(--color-green-700);
+  --color-success-foreground-active: var(--color-green-800);
+  --color-success-foreground-disabled: var(--color-slate-300);
+  --color-success-subtle-background-default: var(--color-green-100);
+  --color-success-subtle-background-hover: var(--color-green-200);
+  --color-success-subtle-background-active: var(--color-green-300);
+  --color-success-subtle-background-disabled: var(--color-white);
+  --color-success-subtle-foreground-default: var(--color-green-700);
+  --color-success-subtle-foreground-hover: var(--color-green-700);
+  --color-success-subtle-foreground-active: var(--color-green-700);
+  --color-success-subtle-foreground-disabled: var(--color-slate-300);
+  --color-success-p-background-default: var(--color-green-600);
+  --color-success-p-background-hover: var(--color-green-700);
+  --color-success-p-background-active: var(--color-green-800);
+  --color-success-p-background-disabled: var(--color-slate-300);
+  --color-success-p-foreground-default: var(--color-white);
+  --color-success-p-foreground-hover: var(--color-white);
+  --color-success-p-foreground-active: var(--color-white);
+  --color-success-p-foreground-disabled: var(--color-white);
+  --color-success-border-default: var(--color-green-400);
+  --color-success-border-hover: var(--color-green-800);
+  --color-success-border-active: var(--color-green-700);
+  --color-success-border-disabled: var(--color-slate-300);
+  --color-success-subtle-border-default: var(--color-green-300);
+  --color-success-subtle-border-hover: var(--color-green-800);
+  --color-success-subtle-border-active: var(--color-green-700);
+  --color-success-subtle-border-disabled: var(--color-slate-300);
+
+  /* ── warning (→ amber) ── */
+  --color-warning-background-default: var(--color-white);
+  --color-warning-background-hover: var(--color-amber-100);
+  --color-warning-background-active: var(--color-amber-200);
+  --color-warning-background-disabled: var(--color-white);
+  --color-warning-foreground-default: var(--color-amber-600);
+  --color-warning-foreground-hover: var(--color-amber-700);
+  --color-warning-foreground-active: var(--color-amber-800);
+  --color-warning-foreground-disabled: var(--color-slate-300);
+  --color-warning-subtle-background-default: var(--color-amber-100);
+  --color-warning-subtle-background-hover: var(--color-amber-200);
+  --color-warning-subtle-background-active: var(--color-amber-300);
+  --color-warning-subtle-background-disabled: var(--color-white);
+  --color-warning-subtle-foreground-default: var(--color-amber-700);
+  --color-warning-subtle-foreground-hover: var(--color-amber-700);
+  --color-warning-subtle-foreground-active: var(--color-amber-700);
+  --color-warning-subtle-foreground-disabled: var(--color-slate-300);
+  --color-warning-p-background-default: var(--color-amber-600);
+  --color-warning-p-background-hover: var(--color-amber-700);
+  --color-warning-p-background-active: var(--color-amber-800);
+  --color-warning-p-background-disabled: var(--color-slate-300);
+  --color-warning-p-foreground-default: var(--color-white);
+  --color-warning-p-foreground-hover: var(--color-white);
+  --color-warning-p-foreground-active: var(--color-white);
+  --color-warning-p-foreground-disabled: var(--color-white);
+  --color-warning-border-default: var(--color-amber-400);
+  --color-warning-border-hover: var(--color-amber-800);
+  --color-warning-border-active: var(--color-amber-700);
+  --color-warning-border-disabled: var(--color-slate-300);
+  --color-warning-subtle-border-default: var(--color-amber-300);
+  --color-warning-subtle-border-hover: var(--color-amber-800);
+  --color-warning-subtle-border-active: var(--color-amber-700);
+  --color-warning-subtle-border-disabled: var(--color-slate-300);
+
+  /* ── error (→ red) ── */
+  --color-error-background-default: var(--color-white);
+  --color-error-background-hover: var(--color-red-100);
+  --color-error-background-active: var(--color-red-200);
+  --color-error-background-disabled: var(--color-white);
+  --color-error-foreground-default: var(--color-red-600);
+  --color-error-foreground-hover: var(--color-red-700);
+  --color-error-foreground-active: var(--color-red-800);
+  --color-error-foreground-disabled: var(--color-slate-300);
+  --color-error-subtle-background-default: var(--color-red-100);
+  --color-error-subtle-background-hover: var(--color-red-200);
+  --color-error-subtle-background-active: var(--color-red-300);
+  --color-error-subtle-background-disabled: var(--color-white);
+  --color-error-subtle-foreground-default: var(--color-red-700);
+  --color-error-subtle-foreground-hover: var(--color-red-700);
+  --color-error-subtle-foreground-active: var(--color-red-700);
+  --color-error-subtle-foreground-disabled: var(--color-slate-300);
+  --color-error-p-background-default: var(--color-red-600);
+  --color-error-p-background-hover: var(--color-red-700);
+  --color-error-p-background-active: var(--color-red-800);
+  --color-error-p-background-disabled: var(--color-slate-300);
+  --color-error-p-foreground-default: var(--color-white);
+  --color-error-p-foreground-hover: var(--color-white);
+  --color-error-p-foreground-active: var(--color-white);
+  --color-error-p-foreground-disabled: var(--color-white);
+  --color-error-border-default: var(--color-red-400);
+  --color-error-border-hover: var(--color-red-800);
+  --color-error-border-active: var(--color-red-700);
+  --color-error-border-disabled: var(--color-slate-300);
+  --color-error-subtle-border-default: var(--color-red-300);
+  --color-error-subtle-border-hover: var(--color-red-800);
+  --color-error-subtle-border-active: var(--color-red-700);
+  --color-error-subtle-border-disabled: var(--color-slate-300);
+
+  /* ── info (→ teal) ── */
+  --color-info-background-default: var(--color-white);
+  --color-info-background-hover: var(--color-teal-100);
+  --color-info-background-active: var(--color-teal-200);
+  --color-info-background-disabled: var(--color-white);
+  --color-info-foreground-default: var(--color-teal-600);
+  --color-info-foreground-hover: var(--color-teal-700);
+  --color-info-foreground-active: var(--color-teal-800);
+  --color-info-foreground-disabled: var(--color-slate-300);
+  --color-info-subtle-background-default: var(--color-teal-100);
+  --color-info-subtle-background-hover: var(--color-teal-200);
+  --color-info-subtle-background-active: var(--color-teal-300);
+  --color-info-subtle-background-disabled: var(--color-white);
+  --color-info-subtle-foreground-default: var(--color-teal-700);
+  --color-info-subtle-foreground-hover: var(--color-teal-700);
+  --color-info-subtle-foreground-active: var(--color-teal-700);
+  --color-info-subtle-foreground-disabled: var(--color-slate-300);
+  --color-info-p-background-default: var(--color-teal-600);
+  --color-info-p-background-hover: var(--color-teal-700);
+  --color-info-p-background-active: var(--color-teal-800);
+  --color-info-p-background-disabled: var(--color-slate-300);
+  --color-info-p-foreground-default: var(--color-white);
+  --color-info-p-foreground-hover: var(--color-white);
+  --color-info-p-foreground-active: var(--color-white);
+  --color-info-p-foreground-disabled: var(--color-white);
+  --color-info-border-default: var(--color-teal-400);
+  --color-info-border-hover: var(--color-teal-800);
+  --color-info-border-active: var(--color-teal-700);
+  --color-info-border-disabled: var(--color-slate-300);
+  --color-info-subtle-border-default: var(--color-teal-300);
+  --color-info-subtle-border-hover: var(--color-teal-800);
+  --color-info-subtle-border-active: var(--color-teal-700);
+  --color-info-subtle-border-disabled: var(--color-slate-300);
+
+  /* ── focus ── */
+  --color-focus: var(--color-teal-500);
+
+  /* ── Status indicators (custom oklch, no Tailwind equivalent) ── */
+  --color-status-healthy: oklch(0.55 0.17 145);
+  --color-status-degraded: oklch(0.70 0.15 85);
+  --color-status-down: oklch(0.55 0.22 27);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    color: var(--color-slate-950);
+    background-color: var(--color-slate-50);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+  }
+}
+
+@keyframes tooltip-fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes tooltip-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.95); }
+}

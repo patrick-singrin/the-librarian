@@ -1,0 +1,44 @@
+# Paperless Metadata Enrichment - Settings
+# Copy this file to settings.yaml and fill in your credentials
+
+# Paperless-NGX connection
+paperless:
+  base_url: "http://your-nas:8777"
+  api_token: "your_paperless_token_here"
+
+# LM Studio connection
+lm_studio:
+  base_url: "http://localhost:1234"
+  model: "mistralai/ministral-3-14b-instruct-2512"
+  temperature: 0.3
+  max_tokens: 4096
+  timeout: 180
+
+# Enrichment behavior
+enrichment:
+  target_tag_id: 151  # "NEW" tag - only process documents with this tag
+  remove_tag_after_processing: true
+  min_tags: 2
+  max_tags: 7
+  confidence_threshold: 0.70
+  auto_approve_threshold: 0.85
+  optimize_title: true
+  add_tags: true
+  set_correspondent: true
+  set_document_type: true
+  create_missing_correspondent: true
+  create_missing_document_type: true
+
+# Processing behavior
+processing:
+  batch_size: 10
+  interactive: true
+  dry_run: false
+  max_retries: 2
+  retry_delay_seconds: 5
+
+# Logging
+logging:
+  level: "INFO"
+  file: "logs/enrichment.log"
+  console: true

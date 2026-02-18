@@ -1,0 +1,141 @@
+# Paperless Metadata Enrichment - Tagging Rules
+# Automatic rules applied before LLM analysis
+
+# Automatic tagging rules (applied before LLM)
+auto_rules:
+  # Filename-based rules
+  - name: "Invoice Detection"
+    trigger: filename
+    conditions:
+      - pattern: "invoice|rechnung|factura"
+        case_insensitive: true
+    actions:
+      add_tags: ["receipts", "financial"]
+      set_type: "Invoice"
+      confidence_boost: 0.15
+
+  - name: "Anthropic Content"
+    trigger: filename
+    conditions:
+      - pattern: "anthropic|claude"
+        case_insensitive: true
+    actions:
+      add_tags: ["anthropic"]
+      confidence_boost: 0.1
+
+  - name: "UX Research Content"
+    trigger: filename
+    conditions:
+      - pattern: "ux|user.?experience|research"
+        case_insensitive: true
+    actions:
+      add_tags: ["ux-research"]
+      confidence_boost: 0.1
+
+  # Content-based rules
+  - name: "Research Document Detection"
+    trigger: content
+    conditions:
+      - pattern: "research findings|user study|interview|survey results"
+        case_insensitive: true
+    actions:
+      add_tags: ["ux-research"]
+      set_type: "Research Report"
+      confidence_boost: 0.2
+
+  - name: "Meeting Notes Detection"
+    trigger: content
+    conditions:
+      - pattern: "meeting notes|minutes|agenda|attendees"
+        case_insensitive: true
+    actions:
+      add_tags: ["meeting-notes"]
+      set_type: "Meeting Notes"
+
+  # File type rules
+  - name: "PDF Scans"
+    trigger: file_extension
+    conditions:
+      - extension: ".pdf"
+    actions:
+      add_tags: ["scan"]
+
+  - name: "Markdown Documents"
+    trigger: file_extension
+    conditions:
+      - extension: ".md"
+    actions:
+      add_tags: ["notes", "documentation"]
+
+# Validation and normalization
+validation:
+  # Tag aliases - normalize variations to standard form
+  tag_aliases:
+    "UX": "ux-research"
+    "User Experience": "ux-research"
+    "UserExperience": "ux-research"
+    "Anthropic Claude": "anthropic"
+    "Claude AI": "anthropic"
+    "T-Systems": "t-systems"
+    "TSI": "t-systems"
+    "SmartChat": "smartchat"
+    
+  # Forbidden tag combinations (warn user)
+  conflicts:
+    - tags: ["personal", "work"]
+      action: warn
+      message: "Document tagged as both personal and work"
+    
+    - tags: ["draft", "final"]
+      action: warn
+      message: "Document marked as both draft and final"
+
+  # Tag categories for better organization
+  categories:
+    work:
+      - "anthropic"
+      - "ux-research"
+      - "smartchat"
+      - "t-systems"
+      - "design-system"
+      - "meeting-notes"
+    
+    personal:
+      - "receipts"
+      - "contracts"
+      - "medical"
+      - "travel"
+      - "financial"
+    
+    learning:
+      - "prompting"
+      - "llm"
+      - "system-prompts"
+      - "documentation"
+
+# Fallback strategies
+fallback:
+  # What to do if confidence < threshold
+  low_confidence:
+    action: "manual"  # manual | skip | apply_partial
+    message: "⚠️  Low confidence - needs manual review"
+  
+  # What to do if LLM suggests unknown tag
+  unknown_tag:
+    action: "create"  # create | ignore | suggest_similar
+    ask_confirmation: true
+  
+  # What to do if correspondent doesn't exist
+  unknown_correspondent:
+    action: "create"  # create | skip | suggest_similar
+    ask_confirmation: true
+  
+  # What to do if document type doesn't exist
+  unknown_document_type:
+    action: "create"  # create | skip | suggest_similar
+    ask_confirmation: true
+  
+  # What to do on API error
+  on_error:
+    action: "skip"  # skip | retry | abort
+    retry_count: 2
