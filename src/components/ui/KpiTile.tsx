@@ -54,7 +54,7 @@ export function KpiTile({
           className="pt-6 pb-4 text-[30px] font-semibold leading-9 text-base-foreground-default"
           title={description}
         >
-          {loading ? '\u2026' : formatValue(value)}
+          {loading && value == null ? '\u2026' : formatValue(value)}
         </span>
 
         <footer className="flex items-center gap-1 pt-2 text-xs text-base-subtle-foreground-default">
