@@ -17,6 +17,8 @@ interface KpiTileProps {
   badge?: TileBadge
   /** Timestamp for "Last Updated" (epoch ms or Date) */
   updatedAt?: number | Date | null
+  /** Optional description shown as a tooltip on the value */
+  description?: string
   className?: string
 }
 
@@ -39,6 +41,7 @@ export function KpiTile({
   icon,
   badge,
   updatedAt,
+  description,
   className = '',
 }: KpiTileProps) {
   // Re-render every 60 s so the relative timestamp stays fresh
@@ -47,7 +50,10 @@ export function KpiTile({
   return (
     <Tile title={title} icon={icon} badge={badge} className={className}>
       <div className="flex flex-col items-center rounded-lg bg-base-subtle-background-default px-2 py-2">
-        <span className="pt-6 pb-4 text-[30px] font-semibold leading-9 text-base-foreground-default">
+        <span
+          className="pt-6 pb-4 text-[30px] font-semibold leading-9 text-base-foreground-default"
+          title={description}
+        >
           {loading ? '\u2026' : formatValue(value)}
         </span>
 

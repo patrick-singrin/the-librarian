@@ -21,6 +21,8 @@ export interface Config {
   llmApiUrl: string
   llmApiKey: string
   qdrantUrl: string
+  metaNewTagId: number
+  metaNewTagName: string
 }
 
 export const config: Config = {
@@ -32,6 +34,8 @@ export const config: Config = {
   llmApiUrl: process.env.LLM_API_URL || process.env.LM_STUDIO_URL || '',
   llmApiKey: process.env.LLM_API_KEY || '',
   qdrantUrl: process.env.QDRANT_URL || '',
+  metaNewTagId: parseInt(process.env.META_NEW_TAG_ID || '151', 10),
+  metaNewTagName: process.env.META_NEW_TAG_NAME || 'NEW',
 }
 
 /** Resolved paths to local tool directories (relative to project root) */
@@ -48,6 +52,8 @@ const envKeyMap: Record<string, string> = {
   llmApiUrl: 'LLM_API_URL',
   llmApiKey: 'LLM_API_KEY',
   qdrantUrl: 'QDRANT_URL',
+  metaNewTagId: 'META_NEW_TAG_ID',
+  metaNewTagName: 'META_NEW_TAG_NAME',
 }
 
 /** Writable config keys (excludes port and tool paths) */
@@ -69,8 +75,8 @@ export function updateConfig(updates: Record<string, string>): void {
     const envVar = envKeyMap[key]
     if (!envVar) continue
 
-    // Update in-memory config
-    config[key] = value
+    // Update in-memory config (parse numeric keys)
+    config[key] = key === 'metaNewTagId' ? parseInt(value, 10) : value
 
     // Update .env content
     const regex = new RegExp(`^${envVar}=.*$`, 'm')

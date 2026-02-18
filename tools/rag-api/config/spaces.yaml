@@ -1,0 +1,8 @@
+defaults:
+  chunk_tokens: 800
+  chunk_overlap: 120
+  top_k: 6
+  score_threshold: 0.35
+spaces:
+  ux-design:
+    name: UX Design

@@ -43,3 +43,6 @@ export type { InputItemProps } from './InputItem'
 export { TextField } from './TextField'
 export type { TextFieldProps } from './TextField'
 
+export { Select, SelectItem } from './Select'
+export type { SelectProps } from './Select'
+

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     CHUNK_TOKENS: int = 800
     CHUNK_OVERLAP: int = 120
     MAX_SNIPPETS_TOKENS: int = 2500
+
+    # Space Configuration
+    SPACE_CUSTOM_FIELD_NAME: str = "RAG Spaces"
     
     # Server Configuration
     SERVER_HOST: str = "0.0.0.0"

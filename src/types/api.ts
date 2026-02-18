@@ -45,15 +45,20 @@ export interface RagStats {
   paperless_documents: number | 'unknown'
   embedding_model: string
   llm_model: string
+  space_id?: string | null
+  space_documents?: number
+  space_chunks?: number
 }
 
 export interface CheckNewResponse {
   new_count: number
-  new_documents: Array<{ id: number; title: string; created: string; file_type: string }>
+  new_documents: Array<{ id: number; title: string; created: string; file_type: string; spaces: string[] }>
   total_in_paperless: number
   total_indexed: number
+  unassigned_count: number
   embedding_available: boolean
   llm_available: boolean
+  space_id?: string | null
 }
 
 export interface SyncResponse {
@@ -132,6 +137,8 @@ export interface Settings {
   llmApiUrl: string
   llmApiKey: string
   qdrantUrl: string
+  metaNewTagId: string
+  metaNewTagName: string
 }
 
 export interface ConnectionTestResult {
@@ -145,6 +152,36 @@ export type RagProcessStatus = 'running' | 'starting' | 'stopped'
 export interface RagProcessInfo {
   status: RagProcessStatus
   pathExists: boolean
+}
+
+export interface SpaceParams {
+  chunk_tokens: number
+  chunk_overlap: number
+  top_k: number
+  score_threshold: number
+}
+
+export interface SpaceInfo {
+  slug: string
+  name: string
+  params: SpaceParams
+}
+
+export interface SpaceCreateRequest {
+  slug: string
+  name: string
+  chunk_tokens?: number
+  chunk_overlap?: number
+  top_k?: number
+  score_threshold?: number
+}
+
+export interface SpaceUpdateRequest {
+  name?: string
+  chunk_tokens?: number
+  chunk_overlap?: number
+  top_k?: number
+  score_threshold?: number
 }
 
 export interface LocalToolsInfo {

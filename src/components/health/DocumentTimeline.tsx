@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import { ChartBar, FileArchive } from '@phosphor-icons/react'
 import { useTimeline } from '../../hooks/useTimeline'
+import { useServiceHealth } from '../../hooks/useServiceHealth'
 import { Button, Tile } from '../ui'
 import type { TimelineRange, TimelineBucket } from '../../types/api'
 
@@ -80,6 +81,7 @@ function CustomTooltip({
 export function DocumentTimeline() {
   const [range, setRange] = useState<TimelineRange>('30d')
   const { data, isLoading, error } = useTimeline(range)
+  const paperless = useServiceHealth('paperless')
 
   const buckets = data?.buckets ?? []
 
@@ -110,12 +112,21 @@ export function DocumentTimeline() {
 
         {/* Error */}
         {error && (
-          <div
-            role="alert"
-            className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-3 text-sm text-error-foreground-default"
-          >
-            Unable to load timeline: {error.message}
-          </div>
+          paperless.isStarting ? (
+            <div
+              role="status"
+              className="rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-3 text-sm text-warning-foreground-default"
+            >
+              {paperless.message}
+            </div>
+          ) : (
+            <div
+              role="alert"
+              className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-3 text-sm text-error-foreground-default"
+            >
+              Unable to load timeline: {error.message}
+            </div>
+          )
         )}
 
         {/* Chart area */}

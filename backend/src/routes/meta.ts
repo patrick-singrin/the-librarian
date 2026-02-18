@@ -1,14 +1,13 @@
 import { Router } from 'express'
+import { config } from '../config.js'
 import { listDocumentsWithTag } from '../services/paperless-client.js'
 import { getMetaStatus, runMetaEnrich } from '../services/meta-runner.js'
 
 export const metaRouter = Router()
 
-const NEW_TAG_ID = 151
-
 metaRouter.get('/pending', async (_req, res) => {
   try {
-    const result = await listDocumentsWithTag(NEW_TAG_ID)
+    const result = await listDocumentsWithTag(config.metaNewTagId)
     res.json(result)
   } catch (e) {
     res.status(502).json({ error: (e as Error).message })

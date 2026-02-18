@@ -9,6 +9,7 @@ class AskRequest(BaseModel):
     query: str = Field(..., description="The question to ask about the documents")
     filter_tags: Optional[List[str]] = Field(None, description="Optional list of paperless tags to filter by")
     top_k: Optional[int] = Field(None, description="Number of top results to retrieve (overrides default)")
+    space_id: Optional[str] = Field(None, description="Optional space slug to scope the search")
     history: Optional[List[dict]] = Field(
         default=None,
         description="Optional recent chat history as a list of {role, content}"

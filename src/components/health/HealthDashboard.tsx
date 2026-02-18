@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Files, TrayArrowDown, ArrowsClockwise, FileArchive, Circuitry } from '@phosphor-icons/react'
 import { useOverview } from '../../hooks/useOverview'
+import { useServiceHealth } from '../../hooks/useServiceHealth'
 import { KpiTile } from '../ui'
 import { DocumentTimeline } from './DocumentTimeline'
 
@@ -13,6 +14,7 @@ interface Snapshot {
 
 export function HealthDashboard() {
   const { data, isFetching, error, dataUpdatedAt } = useOverview()
+  const rag = useServiceHealth('rag')
   const lastGood = useRef<Snapshot | null>(null)
 
   const p = data?.paperless
@@ -39,9 +41,15 @@ export function HealthDashboard() {
   return (
     <div>
       {error && (
-        <div role="alert" className="mb-4 rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
-          Unable to load overview: {error.message}
-        </div>
+        rag.isStarting ? (
+          <div role="status" className="mb-4 rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
+            {rag.message}
+          </div>
+        ) : (
+          <div role="alert" className="mb-4 rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
+            Unable to load overview: {error.message}
+          </div>
+        )
       )}
 
       <section aria-label="Key statistics">
@@ -69,6 +77,7 @@ export function HealthDashboard() {
             value={snap?.syncPct}
             loading={loading}
             updatedAt={snap?.updatedAt}
+            description="Documents assigned to a RAG space"
           />
         </div>
       </section>

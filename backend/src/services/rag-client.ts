@@ -25,14 +25,16 @@ export async function ragAsk(body: unknown): Promise<unknown> {
   return res.json()
 }
 
-export async function ragStats(): Promise<unknown> {
-  const res = await ragFetch('/stats')
+export async function ragStats(spaceId?: string): Promise<unknown> {
+  const qs = spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''
+  const res = await ragFetch(`/stats${qs}`)
   if (!res.ok) throw new Error(`RAG API error: ${res.status}`)
   return res.json()
 }
 
-export async function ragCheckNew(): Promise<unknown> {
-  const res = await ragFetch('/check-new')
+export async function ragCheckNew(spaceId?: string): Promise<unknown> {
+  const qs = spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''
+  const res = await ragFetch(`/check-new${qs}`)
   if (!res.ok) throw new Error(`RAG API error: ${res.status}`)
   return res.json()
 }
@@ -44,5 +46,38 @@ export async function ragSync(body?: unknown): Promise<unknown> {
     signal: AbortSignal.timeout(300000),
   })
   if (!res.ok) throw new Error(`RAG API error: ${res.status}`)
+  return res.json()
+}
+
+export async function ragSpaces(): Promise<unknown> {
+  const res = await ragFetch('/spaces')
+  if (!res.ok) throw new Error(`RAG API error: ${res.status}`)
+  return res.json()
+}
+
+export async function ragCreateSpace(body: unknown): Promise<unknown> {
+  const res = await ragFetch('/spaces', { method: 'POST', body: JSON.stringify(body) })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { detail?: string }).detail || `RAG API error: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function ragUpdateSpace(slug: string, body: unknown): Promise<unknown> {
+  const res = await ragFetch(`/spaces/${encodeURIComponent(slug)}`, { method: 'PUT', body: JSON.stringify(body) })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { detail?: string }).detail || `RAG API error: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function ragDeleteSpace(slug: string): Promise<unknown> {
+  const res = await ragFetch(`/spaces/${encodeURIComponent(slug)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { detail?: string }).detail || `RAG API error: ${res.status}`)
+  }
   return res.json()
 }

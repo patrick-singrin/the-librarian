@@ -11,7 +11,8 @@ from sentence_transformers import SentenceTransformer
 
 from .config import get_settings
 from .extractors import extract_text_from_file
-from .paperless import get_document, download_document
+from .paperless import get_document, download_document, get_document_spaces
+from .spaces_config import get_space_params
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -182,7 +183,24 @@ async def ingest_document(
         title = doc_metadata.get('title', f'Document {doc_id}')
         file_type = doc_metadata.get('file_type', 'unknown')
         tags = doc_metadata.get("tags", [])
-        
+
+        # Determine space assignment
+        space_ids = get_document_spaces(doc_metadata)
+        if not space_ids:
+            logger.info(f"Document {doc_id} has no valid space assignment, skipping")
+            return {
+                "doc_id": doc_id,
+                "title": title,
+                "status": "skipped",
+                "chunks_created": 0,
+                "reason": "no_spaces_assigned"
+            }
+
+        # Resolve per-space chunking params (use largest chunk_tokens if multi-space)
+        space_params_list = [get_space_params(sid) for sid in space_ids]
+        effective_chunk_tokens = max(sp.chunk_tokens for sp in space_params_list)
+        effective_chunk_overlap = max(sp.chunk_overlap for sp in space_params_list)
+
         # Check if document already exists (unless force reindex)
         if not force_reindex:
             existing_chunks = qdrant_client.scroll(
@@ -226,9 +244,9 @@ async def ingest_document(
             if not page_text.strip():
                 continue
             
-            # Split page text into chunks
-            text_chunks = chunk_text(page_text)
-            
+            # Split page text into chunks using per-space params
+            text_chunks = chunk_text(page_text, chunk_tokens=effective_chunk_tokens, overlap_tokens=effective_chunk_overlap)
+
             for text_chunk in text_chunks:
                 chunk_metadata = {
                     "text": text_chunk,
@@ -237,6 +255,7 @@ async def ingest_document(
                     "page": page_num,
                     "file_type": file_type,
                     "tags": tags,
+                    "space_ids": space_ids,
                     "ingested_at": datetime.utcnow().isoformat(),
                     "token_count": count_tokens(text_chunk)
                 }

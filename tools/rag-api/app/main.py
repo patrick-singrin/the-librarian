@@ -19,11 +19,14 @@ from .models import (
     AskRequest, AskResponse, Citation, IngestRequest, IngestResponse,
     HealthResponse, DocumentInfo
 )
-from .paperless import test_connection as test_paperless_connection, list_documents, list_all_documents, get_document
+from .paperless import (
+    test_connection as test_paperless_connection, list_documents, list_all_documents,
+    get_document, build_document_url, get_space_field_id, get_document_spaces,
+)
 from .retriever import search_similar_chunks, deduplicate_chunks
 from .llm import generate_answer, test_llm_connection
 from .ingest import ensure_collection, ingest_document, get_collection_stats
-from .paperless import build_document_url
+from .spaces_config import get_all_spaces_info, get_defined_spaces, get_space_params, load_spaces_config, save_spaces_config
 
 # Configure logging
 logging.basicConfig(
@@ -80,6 +83,8 @@ async def lifespan(app: FastAPI):
     # ── Best-effort: Paperless ──
     try:
         await test_paperless_connection()
+        # Resolve the RAG Spaces custom field ID early
+        await get_space_field_id()
     except Exception as e:
         logger.warning(f"Paperless unavailable at startup: {e}")
 
@@ -226,7 +231,8 @@ async def ask_question(
     
     try:
         # Search for relevant chunks - increase top_k for better coverage
-        top_k = request.top_k or settings.RAG_TOP_K
+        space_params = get_space_params(request.space_id)
+        top_k = request.top_k or space_params.top_k
         # Double the search results to ensure we get comprehensive coverage
         search_k = top_k * 2 if top_k < 20 else top_k
         chunks = search_similar_chunks(
@@ -234,7 +240,8 @@ async def ask_question(
             embedding_model=embedder,
             query=request.query,
             top_k=search_k,
-            filter_tags=request.filter_tags
+            filter_tags=request.filter_tags,
+            space_id=request.space_id,
         )
         
         # If no chunks found and general chat is allowed, fall back to non-RAG response
@@ -387,11 +394,12 @@ async def ingest_all_documents_background(
 
 @app.get("/check-new")
 async def check_new_documents(
+    space_id: Optional[str] = None,
     qdrant: QdrantClient = Depends(get_qdrant_client),
-    embedder: SentenceTransformer = Depends(get_embedding_model)
+    embedder: SentenceTransformer = Depends(get_embedding_model),
 ):
     """Check for new documents WITHOUT indexing them. Also checks if LLM/embedding model is available."""
-    logger.info("Checking for new documents (no indexing)")
+    logger.info(f"Checking for new documents (no indexing, space_id={space_id})")
     
     # First: Check if LLM and embedding model are available
     llm_available = False
@@ -418,42 +426,61 @@ async def check_new_documents(
         # Get all documents from Paperless (use large page_size to get all)
         docs_response = await list_documents(page_size=10000)
         paperless_docs = docs_response.get("results", [])
-        
+
         # Create lookup dict for doc details
         paperless_docs_dict = {doc["id"]: doc for doc in paperless_docs}
-        paperless_doc_ids = set(paperless_docs_dict.keys())
-        
-        logger.info(f"Found {len(paperless_doc_ids)} documents in Paperless")
-        
-        # Get all indexed document IDs from Qdrant
+
+        # Only documents with a valid space assignment are RAG-eligible.
+        # Documents without a space are counted but excluded from sync.
+        unassigned_count = 0
+        paperless_doc_ids = set()
+        for doc in paperless_docs:
+            slugs = get_document_spaces(doc)
+            if not slugs:
+                unassigned_count += 1
+                continue
+            if space_id and space_id not in slugs:
+                continue
+            paperless_doc_ids.add(doc["id"])
+
+        logger.info(f"Found {len(paperless_doc_ids)} documents in Paperless (space_id={space_id})")
+
+        # Get indexed document IDs from Qdrant (optionally filtered by space)
+        from qdrant_client.http.models import Filter, FieldCondition, MatchAny
         indexed_doc_ids = set()
         offset = None
-        
+        scroll_filter = None
+        if space_id:
+            scroll_filter = Filter(
+                must=[FieldCondition(key="space_ids", match=MatchAny(any=[space_id]))]
+            )
+
         while True:
             result = qdrant.scroll(
                 collection_name=settings.COLLECTION_NAME,
                 limit=100,
                 offset=offset,
+                scroll_filter=scroll_filter,
                 with_payload=True,
                 with_vectors=False
             )
-            
+
             points, next_offset = result
-            
+
             for point in points:
                 doc_id = point.payload.get("doc_id")
                 if doc_id:
                     indexed_doc_ids.add(doc_id)
-            
+
             if next_offset is None:
                 break
             offset = next_offset
-        
+
         logger.info(f"Found {len(indexed_doc_ids)} documents already indexed in RAG")
-        
+
         # Find new documents
         new_doc_ids = paperless_doc_ids - indexed_doc_ids
-        
+
         # Build detailed list with titles
         new_documents = []
         for doc_id in sorted(new_doc_ids):
@@ -462,18 +489,21 @@ async def check_new_documents(
                 "id": doc_id,
                 "title": doc_info.get("title", "Unknown"),
                 "created": doc_info.get("created"),
-                "file_type": doc_info.get("file_type", "unknown")
+                "file_type": doc_info.get("file_type", "unknown"),
+                "spaces": get_document_spaces(doc_info),
             })
-        
+
         return {
             "llm_available": llm_available,
             "embedding_available": embedding_available,
             "total_in_paperless": len(paperless_doc_ids),
             "total_indexed": len(indexed_doc_ids),
             "new_count": len(new_doc_ids),
-            "new_documents": new_documents
+            "new_documents": new_documents,
+            "unassigned_count": unassigned_count,
+            "space_id": space_id,
         }
-        
+
     except Exception as e:
         logger.error(f"Check failed: {e}")
         raise HTTPException(status_code=500, detail=f"Check error: {str(e)}")
@@ -483,18 +513,20 @@ async def check_new_documents(
 async def sync_new_documents(
     request: dict = None,
     qdrant: QdrantClient = Depends(get_qdrant_client),
-    embedder: SentenceTransformer = Depends(get_embedding_model)
+    embedder: SentenceTransformer = Depends(get_embedding_model),
 ):
     """Index documents. Can index all new documents or only specific doc_ids.
-    
+
     Request body (optional):
     {
-        "doc_ids": [123, 456, 789]  // If provided, only index these IDs
+        "doc_ids": [123, 456, 789],  // If provided, only index these IDs
+        "space_id": "work"            // If provided, only sync docs belonging to this space
     }
-    
-    If doc_ids is not provided, indexes ALL new documents.
+
+    If doc_ids is not provided, indexes ALL new documents (optionally filtered by space).
     """
-    logger.info("Starting sync")
+    sync_space_id = (request or {}).get("space_id")
+    logger.info(f"Starting sync (space_id={sync_space_id})")
     
     # Check if embedding model is available
     try:
@@ -511,38 +543,52 @@ async def sync_new_documents(
         if request and "doc_ids" in request:
             requested_doc_ids = set(request["doc_ids"])
             logger.info(f"Syncing specific documents: {requested_doc_ids}")
-        
+
         # Get all documents from Paperless (use large page_size to get all)
         docs_response = await list_documents(page_size=10000)
         paperless_docs = docs_response.get("results", [])
         paperless_doc_ids = {doc["id"] for doc in paperless_docs}
-        
-        logger.info(f"Found {len(paperless_doc_ids)} documents in Paperless")
-        
-        # Get all indexed document IDs from Qdrant
+
+        # Filter by space if requested
+        if sync_space_id:
+            space_doc_ids = set()
+            for doc in paperless_docs:
+                slugs = get_document_spaces(doc)
+                if sync_space_id in slugs:
+                    space_doc_ids.add(doc["id"])
+            paperless_doc_ids = space_doc_ids
+
+        logger.info(f"Found {len(paperless_doc_ids)} documents in Paperless (space_id={sync_space_id})")
+
+        # Get indexed document IDs from Qdrant (optionally filtered by space)
+        from qdrant_client.http.models import Filter as QFilter, FieldCondition as QFC, MatchAny as QMA
         indexed_doc_ids = set()
         offset = None
-        
+        scroll_filter = None
+        if sync_space_id:
+            scroll_filter = QFilter(must=[QFC(key="space_ids", match=QMA(any=[sync_space_id]))])
+
         while True:
             result = qdrant.scroll(
                 collection_name=settings.COLLECTION_NAME,
                 limit=100,
                 offset=offset,
+                scroll_filter=scroll_filter,
                 with_payload=True,
                 with_vectors=False
             )
-            
+
             points, next_offset = result
-            
+
             for point in points:
                 doc_id = point.payload.get("doc_id")
                 if doc_id:
                     indexed_doc_ids.add(doc_id)
-            
+
             if next_offset is None:
                 break
             offset = next_offset
-        
+
         logger.info(f"Found {len(indexed_doc_ids)} documents already indexed in RAG")
         
         # Determine which documents to index
@@ -736,30 +782,155 @@ async def reset_collection(
 
 @app.get("/stats")
 async def get_statistics(
-    qdrant: QdrantClient = Depends(get_qdrant_client)
+    space_id: Optional[str] = None,
+    qdrant: QdrantClient = Depends(get_qdrant_client),
 ):
-    """Get system statistics."""
+    """Get system statistics, optionally filtered by space."""
     try:
         # Get collection stats
         collection_stats = get_collection_stats(qdrant)
-        
+
         # Get paperless document count
         try:
             docs_response = await list_documents()
             paperless_doc_count = docs_response.get("count", 0)
         except Exception:
             paperless_doc_count = "unknown"
-        
-        return {
+
+        result = {
             "vector_database": collection_stats,
             "paperless_documents": paperless_doc_count,
             "embedding_model": settings.EMBEDDING_MODEL,
-            "llm_model": settings.OPENROUTER_MODEL
+            "llm_model": settings.OPENROUTER_MODEL,
+            "space_id": space_id,
         }
-        
+
+        # If space_id provided, add space-filtered chunk/doc count
+        if space_id:
+            from qdrant_client.http.models import Filter as SFilter, FieldCondition as SFC, MatchAny as SMA
+            space_doc_ids = set()
+            offset = None
+            scroll_filter = SFilter(must=[SFC(key="space_ids", match=SMA(any=[space_id]))])
+            total_space_chunks = 0
+
+            while True:
+                points, next_offset = qdrant.scroll(
+                    collection_name=settings.COLLECTION_NAME,
+                    limit=100,
+                    offset=offset,
+                    scroll_filter=scroll_filter,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                for point in points:
+                    doc_id = point.payload.get("doc_id")
+                    if doc_id:
+                        space_doc_ids.add(doc_id)
+                total_space_chunks += len(points)
+                if next_offset is None:
+                    break
+                offset = next_offset
+
+            result["space_documents"] = len(space_doc_ids)
+            result["space_chunks"] = total_space_chunks
+
+        return result
+
     except Exception as e:
         logger.error(f"Error getting statistics: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting statistics: {str(e)}")
+
+
+@app.get("/spaces")
+async def list_spaces():
+    """Return all defined spaces with their names and tuning parameters."""
+    return get_all_spaces_info()
+
+
+import re
+
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,28}[a-z0-9]?$")
+
+
+@app.post("/spaces")
+async def create_space(body: dict):
+    """Create a new space."""
+    slug = (body.get("slug") or "").strip()
+    name = (body.get("name") or "").strip()
+
+    if not slug or not _SLUG_RE.match(slug):
+        raise HTTPException(status_code=400, detail="slug must be 2-30 lowercase alphanumeric/hyphens, starting with a letter or digit")
+    if not name or len(name) > 60:
+        raise HTTPException(status_code=400, detail="name is required and must be at most 60 characters")
+
+    config = load_spaces_config()
+    if slug in config["spaces"]:
+        raise HTTPException(status_code=409, detail=f"Space '{slug}' already exists")
+
+    space_data: dict = {"name": name}
+    for key in ("chunk_tokens", "chunk_overlap", "top_k"):
+        if key in body and body[key] is not None:
+            val = int(body[key])
+            if val <= 0:
+                raise HTTPException(status_code=400, detail=f"{key} must be a positive integer")
+            space_data[key] = val
+    if "score_threshold" in body and body["score_threshold"] is not None:
+        val = float(body["score_threshold"])
+        if not (0 < val <= 1):
+            raise HTTPException(status_code=400, detail="score_threshold must be between 0 and 1")
+        space_data["score_threshold"] = val
+
+    config["spaces"][slug] = space_data
+    save_spaces_config(config["spaces"])
+    logger.info(f"Created space '{slug}'")
+    return get_all_spaces_info()
+
+
+@app.put("/spaces/{slug}")
+async def update_space(slug: str, body: dict):
+    """Update an existing space."""
+    config = load_spaces_config()
+    if slug not in config["spaces"]:
+        raise HTTPException(status_code=404, detail=f"Space '{slug}' not found")
+
+    space_data = config["spaces"][slug]
+
+    if "name" in body:
+        name = (body["name"] or "").strip()
+        if not name or len(name) > 60:
+            raise HTTPException(status_code=400, detail="name must be 1-60 characters")
+        space_data["name"] = name
+
+    for key in ("chunk_tokens", "chunk_overlap", "top_k"):
+        if key in body and body[key] is not None:
+            val = int(body[key])
+            if val <= 0:
+                raise HTTPException(status_code=400, detail=f"{key} must be a positive integer")
+            space_data[key] = val
+
+    if "score_threshold" in body and body["score_threshold"] is not None:
+        val = float(body["score_threshold"])
+        if not (0 < val <= 1):
+            raise HTTPException(status_code=400, detail="score_threshold must be between 0 and 1")
+        space_data["score_threshold"] = val
+
+    config["spaces"][slug] = space_data
+    save_spaces_config(config["spaces"])
+    logger.info(f"Updated space '{slug}'")
+    return get_all_spaces_info()
+
+
+@app.delete("/spaces/{slug}")
+async def delete_space(slug: str):
+    """Delete a space from the config."""
+    config = load_spaces_config()
+    if slug not in config["spaces"]:
+        raise HTTPException(status_code=404, detail=f"Space '{slug}' not found")
+
+    del config["spaces"][slug]
+    save_spaces_config(config["spaces"])
+    logger.info(f"Deleted space '{slug}'")
+    return get_all_spaces_info()
 
 
 @app.get("/")

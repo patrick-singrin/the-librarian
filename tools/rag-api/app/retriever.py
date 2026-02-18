@@ -7,6 +7,7 @@ from qdrant_client.http.models import Filter, FieldCondition, MatchAny
 from sentence_transformers import SentenceTransformer
 
 from .config import get_settings
+from .spaces_config import get_space_params
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -20,44 +21,51 @@ def search_similar_chunks(
     query: str,
     top_k: int = None,
     filter_tags: Optional[List[str]] = None,
-    score_threshold: float = 0.2  # Lower threshold for better coverage
+    space_id: Optional[str] = None,
+    score_threshold: float = None,
 ) -> List[Dict[str, Any]]:
     """
     Search for similar document chunks using vector similarity.
-    
+
     Args:
         qdrant_client: Qdrant client instance
         embedding_model: Sentence transformer model for embeddings
         query: Search query text
         top_k: Number of top results to return
         filter_tags: Optional list of tags to filter by
+        space_id: Optional space slug to scope the search
         score_threshold: Minimum similarity score threshold
-    
+
     Returns:
         List of similar chunks with metadata and scores
     """
+    # Apply per-space params if a space is specified
+    space_params = get_space_params(space_id)
     if top_k is None:
-        top_k = settings.RAG_TOP_K
-    
+        top_k = space_params.top_k
+    if score_threshold is None:
+        score_threshold = space_params.score_threshold
+
     try:
         # Generate query embedding
         query_vector = embedding_model.encode([query], convert_to_tensor=False)
         if hasattr(query_vector, 'tolist'):
             query_vector = query_vector.tolist()
         query_vector = query_vector[0]  # Get the first (and only) embedding
-        
-        # Build search filter
-        search_filter = None
+
+        # Build search filter conditions
+        filter_conditions = []
         if filter_tags:
-            search_filter = Filter(
-                must=[
-                    FieldCondition(
-                        key="tags",
-                        match=MatchAny(any=filter_tags)
-                    )
-                ]
+            filter_conditions.append(
+                FieldCondition(key="tags", match=MatchAny(any=filter_tags))
             )
-        
+        if space_id:
+            filter_conditions.append(
+                FieldCondition(key="space_ids", match=MatchAny(any=[space_id]))
+            )
+
+        search_filter = Filter(must=filter_conditions) if filter_conditions else None
+
         # Perform vector search (qdrant-client >= 1.14 uses query_points)
         search_response = qdrant_client.query_points(
             collection_name=COLLECTION_NAME,

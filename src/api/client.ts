@@ -15,20 +15,48 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<import('../types/api.js').HealthResponse>('/api/health'),
 
-  ragAsk: (query: string) =>
+  ragAsk: (query: string, spaceId?: string) =>
     request<import('../types/api.js').AskResponse>('/api/rag/ask', {
       method: 'POST',
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, space_id: spaceId }),
     }),
 
-  ragStats: () => request<import('../types/api.js').RagStats>('/api/rag/stats'),
+  ragStats: (spaceId?: string) => {
+    const qs = spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''
+    return request<import('../types/api.js').RagStats>(`/api/rag/stats${qs}`)
+  },
 
-  ragCheckNew: () => request<import('../types/api.js').CheckNewResponse>('/api/rag/check-new'),
+  ragCheckNew: (spaceId?: string) => {
+    const qs = spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''
+    return request<import('../types/api.js').CheckNewResponse>(`/api/rag/check-new${qs}`)
+  },
 
-  ragSync: (docIds?: number[]) =>
+  ragSync: (docIds?: number[], spaceId?: string) =>
     request<import('../types/api.js').SyncResponse>('/api/rag/sync', {
       method: 'POST',
-      body: JSON.stringify(docIds ? { doc_ids: docIds } : {}),
+      body: JSON.stringify({
+        ...(docIds ? { doc_ids: docIds } : {}),
+        ...(spaceId ? { space_id: spaceId } : {}),
+      }),
+    }),
+
+  ragSpaces: () => request<import('../types/api.js').SpaceInfo[]>('/api/rag/spaces'),
+
+  ragCreateSpace: (body: import('../types/api.js').SpaceCreateRequest) =>
+    request<import('../types/api.js').SpaceInfo[]>('/api/rag/spaces', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  ragUpdateSpace: (slug: string, body: import('../types/api.js').SpaceUpdateRequest) =>
+    request<import('../types/api.js').SpaceInfo[]>(`/api/rag/spaces/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  ragDeleteSpace: (slug: string) =>
+    request<import('../types/api.js').SpaceInfo[]>(`/api/rag/spaces/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
     }),
 
   metaPending: () => request<import('../types/api.js').PaperlessDocumentList>('/api/meta/pending'),

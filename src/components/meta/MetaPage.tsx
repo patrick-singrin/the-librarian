@@ -1,18 +1,37 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMetaPending, useMetaEnrich, useMetaJobStatus } from '../../hooks/useMetaStatus'
-import { Button, Tile, Card } from '../ui'
+import { useSettings, useUpdateSettings } from '../../hooks/useSettings'
+import { useServiceHealth } from '../../hooks/useServiceHealth'
+import { Button, Tile, Card, TextField } from '../ui'
 import type { TileBadge } from '../ui'
 import {
   Atom,
   ArrowsClockwise,
   Wrench,
+  GearSix,
+  FloppyDisk,
 } from '@phosphor-icons/react'
 
 export function MetaPage() {
   const pending = useMetaPending()
   const enrich = useMetaEnrich()
+  const paperless = useServiceHealth('paperless')
+  const settings = useSettings()
+  const updateSettings = useUpdateSettings()
   const [jobStarted, setJobStarted] = useState(false)
   const jobStatus = useMetaJobStatus(jobStarted)
+
+  // Local form state for tag configuration
+  const [tagName, setTagName] = useState('')
+  const [tagId, setTagId] = useState('')
+
+  // Seed form from fetched settings
+  useEffect(() => {
+    if (settings.data) {
+      setTagName(settings.data.metaNewTagName ?? '')
+      setTagId(settings.data.metaNewTagId ?? '')
+    }
+  }, [settings.data])
 
   const docs = pending.data?.results ?? []
   const count = pending.data?.count ?? 0
@@ -25,6 +44,18 @@ export function MetaPage() {
   function handleEnrich() {
     setJobStarted(true)
     enrich.mutate(undefined)
+  }
+
+  const tagDirty =
+    settings.data != null &&
+    (tagName !== (settings.data.metaNewTagName ?? '') ||
+      tagId !== (settings.data.metaNewTagId ?? ''))
+
+  function handleSaveTag() {
+    updateSettings.mutate({
+      metaNewTagName: tagName.trim(),
+      metaNewTagId: tagId.trim(),
+    })
   }
 
   // Tile header badge — shows enrichment state at a glance
@@ -45,9 +76,15 @@ export function MetaPage() {
       <h2 className="text-2xl font-bold text-base-foreground-default">Meta Data Tool</h2>
 
       {pending.error && (
-        <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
-          Unable to load pending documents: {pending.error.message}
-        </div>
+        paperless.isStarting ? (
+          <div role="status" className="rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
+            {paperless.message}
+          </div>
+        ) : (
+          <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
+            Unable to load pending documents: {pending.error.message}
+          </div>
+        )
       )}
 
       {/* ── Section 1: Status ── */}
@@ -152,6 +189,59 @@ export function MetaPage() {
               All documents are enriched.
             </p>
           )}
+        </div>
+      </Tile>
+
+      {/* ── Section 3: Configuration ── */}
+      <Tile title="Configuration" icon={GearSix}>
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-base-subtle-foreground-default">
+            The enrichment process picks up documents tagged with this Paperless tag.
+            After processing, the tag is removed.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <TextField
+              label="Tag Name"
+              required={false}
+              value={tagName}
+              onChange={(e) => setTagName(e.target.value)}
+              placeholder="NEW"
+              helperText="Display name of the tag in Paperless"
+            />
+            <TextField
+              label="Tag ID"
+              required={false}
+              type="number"
+              value={tagId}
+              onChange={(e) => setTagId(e.target.value)}
+              placeholder="151"
+              helperText="Numeric ID from Paperless"
+            />
+          </div>
+
+          {updateSettings.error && (
+            <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-3 text-sm text-error-foreground-default">
+              {updateSettings.error.message}
+            </div>
+          )}
+
+          {updateSettings.isSuccess && !tagDirty && (
+            <div role="status" className="text-xs text-success-foreground-default">
+              Saved
+            </div>
+          )}
+
+          <div>
+            <Button
+              variant="primary-solid"
+              size="sm"
+              iconLeft={FloppyDisk}
+              onPress={handleSaveTag}
+              isDisabled={!tagDirty || updateSettings.isPending || !tagId.trim()}
+            >
+              {updateSettings.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
         </div>
       </Tile>
     </div>
