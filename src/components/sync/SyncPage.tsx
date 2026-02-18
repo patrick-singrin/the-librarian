@@ -95,6 +95,23 @@ export function SyncPage() {
         )}
       </div>
 
+      {/* Embedding model requirement */}
+      {embeddingModel && (
+        <div className="flex items-start gap-2 rounded-lg border border-primary-subtle-border-default bg-primary-subtle-background-default px-3 py-2.5">
+          <Database size={16} weight="regular" className="mt-px shrink-0 text-primary-foreground-default" />
+          <span className="text-xs text-base-subtle-foreground-default">
+            <span className="font-medium text-base-foreground-default">Required embedding model:</span>
+            {' '}{embeddingModel}
+            {' — '}
+            <Indicator variant={embeddingAvailable ? 'success' : 'error'} size="xs" className="inline-block align-middle" />
+            {' '}
+            <span className={embeddingAvailable ? 'text-success-foreground-default' : 'text-error-foreground-default'}>
+              {embeddingAvailable ? 'Available' : 'Not available'}
+            </span>
+          </span>
+        </div>
+      )}
+
       {stats.error && (
         rag.isStarting ? (
           <div role="status" className="rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
