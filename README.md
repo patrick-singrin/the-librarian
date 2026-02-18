@@ -169,7 +169,7 @@ Documents are scoped to spaces — each space gets its own Qdrant collection. On
 ## Tech Stack
 
 - **React 19** with TypeScript and Vite
-- **Tailwind CSS v4** with CSS-first configuration
+- **Custom design system** built on Tailwind CSS v4 — semantic color tokens, Badge, Button, Card, Tile, TextField, Select, Indicator, and more
 - **React Aria Components** for accessible UI primitives
 - **TanStack React Query** for server state management
 - **Phosphor Icons** for iconography
