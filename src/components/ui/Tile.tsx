@@ -3,6 +3,7 @@ import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Icon } from './Icon'
 import type { IndicatorVariant } from './Indicator'
+import { formatRelativeTime } from '../../utils/relativeTime'
 
 interface TileBadge {
   label: string
@@ -19,6 +20,8 @@ interface TileProps {
   badge?: TileBadge
   /** Slot content */
   children: ReactNode
+  /** Optional "Last updated" timestamp (epoch ms or Date) shown at the bottom */
+  updatedAt?: number | Date | null
   className?: string
 }
 
@@ -34,6 +37,7 @@ export function Tile({
   icon: TileIcon,
   badge,
   children,
+  updatedAt,
   className = '',
 }: TileProps) {
   return (
@@ -59,6 +63,14 @@ export function Tile({
       <div className="mt-4">
         {children}
       </div>
+
+      {/* ── Footer: last updated ── */}
+      {updatedAt != null && (
+        <footer className="mt-3 flex items-center justify-end gap-1 text-xs text-base-subtle-foreground-default">
+          <span className="font-light">Last updated:</span>
+          <span className="font-medium">{formatRelativeTime(updatedAt)}</span>
+        </footer>
+      )}
     </article>
   )
 }

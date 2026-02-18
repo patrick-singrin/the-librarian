@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Files, TrayArrowDown, ArrowsClockwise, FileArchive, Circuitry } from '@phosphor-icons/react'
 import { useOverview } from '../../hooks/useOverview'
 import { useServiceHealth } from '../../hooks/useServiceHealth'
+import { useTick } from '../../hooks/useTick'
 import { KpiTile } from '../ui'
 import { DocumentTimeline } from './DocumentTimeline'
 
@@ -16,6 +17,9 @@ export function HealthDashboard() {
   const { data, isFetching, error, dataUpdatedAt } = useOverview()
   const rag = useServiceHealth('rag')
   const lastGood = useRef<Snapshot | null>(null)
+
+  // Keep relative timestamps fresh
+  useTick(60_000)
 
   const p = data?.paperless
   const r = data?.rag

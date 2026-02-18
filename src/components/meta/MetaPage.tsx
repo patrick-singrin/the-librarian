@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useMetaPending, useMetaEnrich, useMetaJobStatus } from '../../hooks/useMetaStatus'
 import { useSettings, useUpdateSettings } from '../../hooks/useSettings'
 import { useServiceHealth } from '../../hooks/useServiceHealth'
+import { useTick } from '../../hooks/useTick'
 import { Button, Tile, Card, TextField } from '../ui'
 import type { TileBadge } from '../ui'
 import {
@@ -20,6 +21,9 @@ export function MetaPage() {
   const updateSettings = useUpdateSettings()
   const [jobStarted, setJobStarted] = useState(false)
   const jobStatus = useMetaJobStatus(jobStarted)
+
+  // Keep relative timestamps fresh
+  useTick(60_000)
 
   // Local form state for tag configuration
   const [tagName, setTagName] = useState('')
@@ -88,7 +92,7 @@ export function MetaPage() {
       )}
 
       {/* ── Section 1: Status ── */}
-      <Tile title="Status" icon={Atom} badge={statusBadge}>
+      <Tile title="Status" icon={Atom} badge={statusBadge} updatedAt={pending.dataUpdatedAt || null}>
         <div className="flex flex-col gap-4">
           {/* Hero: pending count */}
           <div className="flex flex-col items-center rounded-lg bg-base-subtle-background-default px-4 py-5">

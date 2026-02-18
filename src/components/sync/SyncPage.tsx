@@ -151,7 +151,7 @@ export function SyncPage() {
       )}
 
       {/* ── Section 1: Status ── */}
-      <Tile title="Status" icon={ChartBar} badge={statusBadge}>
+      <Tile title="Status" icon={ChartBar} badge={statusBadge} updatedAt={checkNew.dataUpdatedAt || null}>
         <div className="flex flex-col gap-4">
           {/* Hero: indexed count + progress */}
           <div className="flex flex-col items-center rounded-lg bg-base-subtle-background-default px-4 py-5">
@@ -196,20 +196,12 @@ export function SyncPage() {
               </ProgressBar>
             </div>
 
-            {/* Info note + last checked */}
-            <footer className="mt-3 flex flex-col items-center gap-1">
-              {!spaceId && hasSpaces && (
-                <span className="text-[11px] text-base-subtle-foreground-default">
-                  Only documents assigned to a space are indexed
-                </span>
-              )}
-              <span className="flex items-center gap-1 text-xs text-base-subtle-foreground-default">
-                <span className="font-light">Last checked:</span>
-                <span className="font-medium">
-                  {checkNew.dataUpdatedAt ? formatRelativeTime(checkNew.dataUpdatedAt) : '–'}
-                </span>
-              </span>
-            </footer>
+            {/* Info note */}
+            {!spaceId && hasSpaces && (
+              <p className="mt-3 text-center text-[11px] text-base-subtle-foreground-default">
+                Only documents assigned to a space are indexed
+              </p>
+            )}
           </div>
 
           {/* Model info */}
@@ -249,6 +241,7 @@ export function SyncPage() {
               ? { label: `${spaceDocuments.data.total}`, indicator: 'info' as const }
               : undefined
           }
+          updatedAt={spaceDocuments.dataUpdatedAt || null}
         >
           {spaceDocuments.isLoading && !spaceDocuments.data ? (
             <p className="text-sm text-base-subtle-foreground-default">Loading…</p>
