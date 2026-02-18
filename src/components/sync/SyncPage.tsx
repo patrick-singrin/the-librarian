@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ProgressBar } from 'react-aria-components'
 import { useSpaces, useSyncStats, useCheckNew, useSync } from '../../hooks/useSyncStatus'
+import { useSpaceDocuments } from '../../hooks/useSpaceDocuments'
 import { Badge, Button, Tile, Indicator, Card, Select, SelectItem } from '../ui'
 import type { TileBadge } from '../ui'
 import { formatRelativeTime } from '../../utils/relativeTime'
@@ -27,6 +28,7 @@ export function SyncPage() {
   const checkNew = useCheckNew(spaceId)
   const sync = useSync()
   const rag = useServiceHealth('rag')
+  const spaceDocuments = useSpaceDocuments(spaceId)
 
   // Keep relative timestamps fresh
   useTick(60_000)
@@ -194,7 +196,51 @@ export function SyncPage() {
         </div>
       </Tile>
 
-      {/* ── Section 2: Tools ── */}
+      {/* ── Section 2: Indexed Documents (space detail view) ── */}
+      {spaceId && (
+        <Tile
+          title="Indexed Documents"
+          icon={Database}
+          badge={
+            spaceDocuments.data
+              ? { label: `${spaceDocuments.data.total}`, indicator: 'info' as const }
+              : undefined
+          }
+        >
+          {spaceDocuments.isLoading && !spaceDocuments.data ? (
+            <p className="text-sm text-base-subtle-foreground-default">Loading…</p>
+          ) : spaceDocuments.error ? (
+            <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-3 text-sm text-error-foreground-default">
+              Unable to load indexed documents: {spaceDocuments.error.message}
+            </div>
+          ) : spaceDocuments.data && spaceDocuments.data.documents.length === 0 ? (
+            <p className="text-sm text-base-subtle-foreground-default">
+              No documents indexed in this space.
+            </p>
+          ) : spaceDocuments.data ? (
+            <ul className="flex flex-col gap-1">
+              {spaceDocuments.data.documents.map((doc) => (
+                <li key={doc.doc_id}>
+                  <Card padding="sm" className="flex items-center gap-3 !py-2">
+                    <span className="min-w-0 flex-1 truncate text-sm text-base-foreground-default">
+                      <span className="font-medium">#{doc.doc_id}</span>
+                      <span className="ml-2">{doc.title}</span>
+                    </span>
+                    <Badge variant="base" type="outline" size="xs">
+                      {doc.chunk_count} chunk{doc.chunk_count !== 1 ? 's' : ''}
+                    </Badge>
+                    <span className="shrink-0 text-xs text-base-subtle-foreground-default">
+                      {doc.ingested_at ? formatRelativeTime(new Date(doc.ingested_at + 'Z').getTime()) : '–'}
+                    </span>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Tile>
+      )}
+
+      {/* ── Section 3: Tools ── */}
       <Tile title="Tools" icon={Wrench}>
         <div className="flex flex-col gap-4">
           {/* Action buttons */}
@@ -285,7 +331,7 @@ export function SyncPage() {
         </div>
       </Tile>
 
-      {/* ── Section 3: Spaces ── */}
+      {/* ── Section 4: Spaces ── */}
       <SpacesTile />
     </div>
   )

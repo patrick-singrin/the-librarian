@@ -69,6 +69,20 @@ export interface SyncResponse {
   total_chunks: number
 }
 
+export interface IndexedDocument {
+  doc_id: number
+  title: string
+  file_type: string
+  ingested_at: string
+  chunk_count: number
+}
+
+export interface IndexedDocumentsResponse {
+  space_id: string
+  documents: IndexedDocument[]
+  total: number
+}
+
 export interface PaperlessDocument {
   id: number
   title: string

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { ragAsk, ragStats, ragCheckNew, ragSync, ragSpaces, ragCreateSpace, ragUpdateSpace, ragDeleteSpace } from '../services/rag-client.js'
+import { ragAsk, ragStats, ragCheckNew, ragSync, ragIndexedDocuments, ragSpaces, ragCreateSpace, ragUpdateSpace, ragDeleteSpace } from '../services/rag-client.js'
 
 export const ragRouter = Router()
 
@@ -35,6 +35,20 @@ ragRouter.get('/check-new', async (req, res) => {
 ragRouter.post('/sync', async (req, res) => {
   try {
     const result = await ragSync(req.body)
+    res.json(result)
+  } catch (e) {
+    res.status(502).json({ error: (e as Error).message })
+  }
+})
+
+ragRouter.get('/indexed-documents', async (req, res) => {
+  try {
+    const spaceId = req.query.space_id as string | undefined
+    if (!spaceId) {
+      res.status(400).json({ error: 'space_id query parameter is required' })
+      return
+    }
+    const result = await ragIndexedDocuments(spaceId)
     res.json(result)
   } catch (e) {
     res.status(502).json({ error: (e as Error).message })

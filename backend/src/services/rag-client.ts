@@ -49,6 +49,12 @@ export async function ragSync(body?: unknown): Promise<unknown> {
   return res.json()
 }
 
+export async function ragIndexedDocuments(spaceId: string): Promise<unknown> {
+  const res = await ragFetch(`/indexed-documents?space_id=${encodeURIComponent(spaceId)}`)
+  if (!res.ok) throw new Error(`RAG API error: ${res.status}`)
+  return res.json()
+}
+
 export async function ragSpaces(): Promise<unknown> {
   const res = await ragFetch('/spaces')
   if (!res.ok) throw new Error(`RAG API error: ${res.status}`)

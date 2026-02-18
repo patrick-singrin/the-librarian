@@ -841,6 +841,60 @@ async def get_statistics(
         raise HTTPException(status_code=500, detail=f"Error getting statistics: {str(e)}")
 
 
+@app.get("/indexed-documents")
+async def list_indexed_documents(
+    space_id: str,
+    qdrant: QdrantClient = Depends(get_qdrant_client),
+):
+    """List all indexed documents for a given space, with chunk counts."""
+    logger.info(f"Listing indexed documents for space_id={space_id}")
+
+    try:
+        from qdrant_client.http.models import Filter as IFilter, FieldCondition as IFC, MatchAny as IMA
+
+        scroll_filter = IFilter(must=[IFC(key="space_ids", match=IMA(any=[space_id]))])
+        docs: dict = {}  # doc_id -> {title, file_type, ingested_at, chunk_count}
+        offset = None
+
+        while True:
+            points, next_offset = qdrant.scroll(
+                collection_name=settings.COLLECTION_NAME,
+                limit=100,
+                offset=offset,
+                scroll_filter=scroll_filter,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for point in points:
+                doc_id = point.payload.get("doc_id")
+                if doc_id is None:
+                    continue
+                if doc_id not in docs:
+                    docs[doc_id] = {
+                        "doc_id": doc_id,
+                        "title": point.payload.get("title", f"Document {doc_id}"),
+                        "file_type": point.payload.get("file_type", "unknown"),
+                        "ingested_at": point.payload.get("ingested_at"),
+                        "chunk_count": 0,
+                    }
+                docs[doc_id]["chunk_count"] += 1
+
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        documents = sorted(docs.values(), key=lambda d: d["doc_id"])
+        return {
+            "space_id": space_id,
+            "documents": documents,
+            "total": len(documents),
+        }
+
+    except Exception as e:
+        logger.error(f"Error listing indexed documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error listing indexed documents: {str(e)}")
+
+
 @app.get("/spaces")
 async def list_spaces():
     """Return all defined spaces with their names and tuning parameters."""

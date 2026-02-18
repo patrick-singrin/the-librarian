@@ -40,6 +40,11 @@ export const api = {
       }),
     }),
 
+  ragIndexedDocuments: (spaceId: string) => {
+    const qs = `?space_id=${encodeURIComponent(spaceId)}`
+    return request<import('../types/api.js').IndexedDocumentsResponse>(`/api/rag/indexed-documents${qs}`)
+  },
+
   ragSpaces: () => request<import('../types/api.js').SpaceInfo[]>('/api/rag/spaces'),
 
   ragCreateSpace: (body: import('../types/api.js').SpaceCreateRequest) =>
