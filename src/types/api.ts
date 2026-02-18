@@ -116,12 +116,6 @@ export interface OverviewStats {
       noDocumentType: number
     }
   }
-  rag: {
-    indexedChunks: number | null
-    collectionStatus: string | null
-    totalIndexed: number | null
-    totalInPaperless: number | null
-  }
 }
 
 export type TimelineRange = '30d' | '6m' | '12m'

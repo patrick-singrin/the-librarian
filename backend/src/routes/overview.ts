@@ -11,7 +11,6 @@ import {
   getDocumentTimeline,
   type TimelineRange,
 } from '../services/paperless-client.js'
-import { ragStats, ragCheckNew } from '../services/rag-client.js'
 
 export const overviewRouter = Router()
 
@@ -40,8 +39,6 @@ overviewRouter.get('/', async (_req, res) => {
     noCorrResult,
     noTypeResult,
     thisMonthResult,
-    ragResult,
-    ragCheckResult,
   ] = await Promise.allSettled([
     getPaperlessStatistics(),
     getTopTags(8),
@@ -51,8 +48,6 @@ overviewRouter.get('/', async (_req, res) => {
     countNoCorrespondent(),
     countNoDocumentType(),
     countDocumentsThisMonth(),
-    ragStats(),
-    ragCheckNew(),
   ])
 
   // Extract Paperless built-in statistics
@@ -97,18 +92,6 @@ overviewRouter.get('/', async (_req, res) => {
     .filter((d) => d.document_count > 0)
     .map((d) => ({ name: d.name, count: d.document_count }))
 
-  // Extract RAG stats
-  const ragData =
-    ragResult.status === 'fulfilled'
-      ? (ragResult.value as { vector_database?: { points_count?: number; status?: string } })
-      : null
-
-  // Extract RAG sync status
-  const ragCheck =
-    ragCheckResult.status === 'fulfilled'
-      ? (ragCheckResult.value as { total_indexed?: number; total_in_paperless?: number })
-      : null
-
   res.json({
     paperless: {
       totalDocuments: (pStats.documents_total as number) ?? 0,
@@ -127,12 +110,6 @@ overviewRouter.get('/', async (_req, res) => {
         noCorrespondent: noCorrResult.status === 'fulfilled' ? noCorrResult.value : 0,
         noDocumentType: noTypeResult.status === 'fulfilled' ? noTypeResult.value : 0,
       },
-    },
-    rag: {
-      indexedChunks: ragData?.vector_database?.points_count ?? null,
-      collectionStatus: ragData?.vector_database?.status ?? null,
-      totalIndexed: ragCheck?.total_indexed ?? null,
-      totalInPaperless: ragCheck?.total_in_paperless ?? null,
     },
   })
 })

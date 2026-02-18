@@ -1,57 +1,62 @@
 import { useRef } from 'react'
 import { Files, TrayArrowDown, ArrowsClockwise, FileArchive, Circuitry } from '@phosphor-icons/react'
 import { useOverview } from '../../hooks/useOverview'
+import { useCheckNew } from '../../hooks/useSyncStatus'
 import { useServiceHealth } from '../../hooks/useServiceHealth'
 import { useTick } from '../../hooks/useTick'
 import { KpiTile } from '../ui'
 import { DocumentTimeline } from './DocumentTimeline'
 
-interface Snapshot {
+interface PaperlessSnapshot {
   documents: number
   inbox: number
-  syncPct: string | null
   updatedAt: number
 }
 
 export function HealthDashboard() {
-  const { data, isFetching, error, dataUpdatedAt } = useOverview()
+  const overview = useOverview()
+  const checkNew = useCheckNew()          // shared cache with RAG Tool page
   const rag = useServiceHealth('rag')
-  const lastGood = useRef<Snapshot | null>(null)
+  const lastGoodPaperless = useRef<PaperlessSnapshot | null>(null)
 
   // Keep relative timestamps fresh
   useTick(60_000)
 
-  const p = data?.paperless
-  const r = data?.rag
-
-  // Only accept the response when Paperless actually returned data
+  // ── Paperless KPIs (from overview) ──
+  const p = overview.data?.paperless
   const hasPaperless = p != null && p.totalDocuments > 0
 
   if (hasPaperless) {
-    lastGood.current = {
+    lastGoodPaperless.current = {
       documents: p.totalDocuments,
       inbox: p.inboxDocuments,
-      syncPct:
-        r?.totalIndexed != null && r?.totalInPaperless
-          ? `${Math.round((r.totalIndexed / r.totalInPaperless) * 100)}%`
-          : lastGood.current?.syncPct ?? null,
-      updatedAt: dataUpdatedAt,
+      updatedAt: overview.dataUpdatedAt,
     }
   }
 
-  const snap = lastGood.current
-  const loading = !snap && isFetching
+  const pSnap = lastGoodPaperless.current
+  const pLoading = !pSnap && overview.isFetching
+
+  // ── RAG "Synced" KPI (from useCheckNew — same cache as RAG Tool) ──
+  const cn = checkNew.data
+  const syncPct =
+    cn?.total_indexed != null && cn?.total_in_paperless && cn.total_in_paperless > 0
+      ? `${Math.round((cn.total_indexed / cn.total_in_paperless) * 100)}%`
+      : null
+  const ragLoading = !cn && checkNew.isFetching
+
+  const hasError = overview.error || checkNew.error
 
   return (
     <div>
-      {error && (
+      {hasError && (
         rag.isStarting ? (
           <div role="status" className="mb-4 rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
             {rag.message}
           </div>
         ) : (
           <div role="alert" className="mb-4 rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
-            Unable to load overview: {error.message}
+            Unable to load overview: {(overview.error ?? checkNew.error)?.message}
           </div>
         )
       )}
@@ -62,25 +67,25 @@ export function HealthDashboard() {
             title="Documents"
             icon={Files}
             badge={{ label: 'Paperless', icon: FileArchive }}
-            value={snap?.documents}
-            loading={loading}
-            updatedAt={snap?.updatedAt}
+            value={pSnap?.documents}
+            loading={pLoading}
+            updatedAt={pSnap?.updatedAt}
           />
           <KpiTile
             title="Inbox"
             icon={TrayArrowDown}
             badge={{ label: 'Paperless', icon: FileArchive }}
-            value={snap?.inbox}
-            loading={loading}
-            updatedAt={snap?.updatedAt}
+            value={pSnap?.inbox}
+            loading={pLoading}
+            updatedAt={pSnap?.updatedAt}
           />
           <KpiTile
             title="Synced"
             icon={ArrowsClockwise}
             badge={{ label: 'RAG', icon: Circuitry }}
-            value={snap?.syncPct}
-            loading={loading}
-            updatedAt={snap?.updatedAt}
+            value={syncPct}
+            loading={ragLoading}
+            updatedAt={checkNew.dataUpdatedAt || null}
             description="Documents assigned to a RAG space"
           />
         </div>
