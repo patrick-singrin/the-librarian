@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
 import {
   ArrowRight,
+  Database,
   FloppyDisk,
   MagnifyingGlass,
   PencilSimple,
@@ -26,13 +27,15 @@ import {
   Indicator,
   type IndicatorVariant,
   type IndicatorSize,
-  StatTile,
-  WarnTile,
   KpiTile,
+  SpaceTile,
   Label,
   InputItem,
   TextField,
 } from '../ui'
+
+/** Stable timestamp for demo tiles (module-level to satisfy react-hooks/purity). */
+const DEMO_NOW = Date.now()
 
 /* ────────────────────────────────────────────────────── *
  *  Section wrapper — groups related examples with a
@@ -504,7 +507,7 @@ function TextFieldSection() {
  * ────────────────────────────────────────────────────── */
 
 function KpiTileSection() {
-  const now = Date.now()
+  const now = DEMO_NOW
   return (
     <Section
       title="KpiTile"
@@ -513,34 +516,29 @@ function KpiTileSection() {
       <div>
         <ExampleRow label="default (number + timestamp)">
           <div className="flex gap-4">
-            <KpiTile title="Documents" value={12847} updatedAt={now - 3 * 60_000} />
-            <KpiTile title="Indexed Chunks" value={11903} updatedAt={now - 45 * 60_000} />
+            <KpiTile className="w-[300px]" title="Documents" value={12847} updatedAt={now - 3 * 60_000} />
+            <KpiTile className="w-[300px]" title="Indexed Chunks" value={11903} updatedAt={now - 45 * 60_000} />
           </div>
         </ExampleRow>
         <ExampleRow label="loading">
-          <div className="max-w-[200px]">
-            <KpiTile title="Loading" value={null} loading updatedAt={now} />
-          </div>
+          <KpiTile className="w-[300px]" title="Loading" value={null} loading updatedAt={now} />
         </ExampleRow>
         <ExampleRow label="with badge">
-          <div className="max-w-[200px]">
-            <KpiTile
-              title="With Badge"
-              value={99}
-              badge={{ label: 'Healthy', indicator: 'success' }}
-              updatedAt={now - 5 * 60_000}
-            />
-          </div>
+          <KpiTile
+            className="w-[300px]"
+            title="With Badge"
+            value={99}
+            badge={{ label: 'Healthy', indicator: 'success' }}
+            updatedAt={now - 5 * 60_000}
+          />
         </ExampleRow>
         <ExampleRow label="with icon">
-          <div className="max-w-[200px]">
-            <KpiTile title="With Icon" value="OK" icon={CheckCircle} updatedAt={now - 30 * 3600_000} />
-          </div>
+          <KpiTile className="w-[300px]" title="With Icon" value="OK" icon={CheckCircle} updatedAt={now - 30 * 3600_000} />
         </ExampleRow>
         <ExampleRow label="null value / no timestamp">
           <div className="flex gap-4">
-            <KpiTile title="Null Value" value={null} />
-            <KpiTile title="No Timestamp" value={42} />
+            <KpiTile className="w-[300px]" title="Null Value" value={null} />
+            <KpiTile className="w-[300px]" title="No Timestamp" value={42} />
           </div>
         </ExampleRow>
       </div>
@@ -549,39 +547,57 @@ function KpiTileSection() {
 }
 
 /* ────────────────────────────────────────────────────── *
- *  StatTile & WarnTile
+ *  SpaceTile
  * ────────────────────────────────────────────────────── */
 
-function TileSection() {
+function SpaceTileSection() {
   return (
     <Section
-      title="StatTile & WarnTile"
-      description="Data display cards for dashboards."
+      title="SpaceTile"
+      description="Per-space sync status tile with indexed/total fraction, progress bar, and action button."
     >
       <div>
-        <ExampleRow label="StatTile (default)">
-          <div className="flex gap-4">
-            <StatTile label="Total documents" value={12847} />
-            <StatTile label="Indexed" value={11903} />
-            <StatTile label="Status" value="Healthy" />
-          </div>
+        <ExampleRow label="partially synced">
+          <SpaceTile
+            className="w-[300px]"
+            title="Work Projects"
+            subtitle="work-projects"
+            icon={Database}
+            badge={{ label: 'Syncing', indicator: 'warning' }}
+            indexed={148}
+            total={312}
+            onOpenSpace={() => undefined}
+          />
         </ExampleRow>
-        <ExampleRow label="StatTile (loading)">
-          <div className="max-w-[200px]">
-            <StatTile label="Pending" value={null} loading />
-          </div>
+        <ExampleRow label="fully synced">
+          <SpaceTile
+            className="w-[300px]"
+            title="Personal Notes"
+            subtitle="personal-notes"
+            icon={Database}
+            badge={{ label: 'Synced', indicator: 'success' }}
+            indexed={42}
+            total={42}
+            onOpenSpace={() => undefined}
+          />
         </ExampleRow>
-        <ExampleRow label='StatTile align="center"'>
-          <div className="flex gap-4">
-            <StatTile label="Centered" value={42} align="center" />
-            <StatTile label="Large number" value={1234567} align="center" />
-          </div>
+        <ExampleRow label="empty space (no documents)">
+          <SpaceTile
+            className="w-[300px]"
+            title="Archive"
+            subtitle="archive"
+            icon={Database}
+            indexed={0}
+            total={0}
+          />
         </ExampleRow>
-        <ExampleRow label="WarnTile">
-          <div className="flex gap-4">
-            <WarnTile label="Missing metadata" value={38} />
-            <WarnTile label="No correspondent" value={7} />
-          </div>
+        <ExampleRow label="without subtitle / without action">
+          <SpaceTile
+            className="w-[300px]"
+            title="Minimal"
+            indexed={7}
+            total={10}
+          />
         </ExampleRow>
       </div>
     </Section>
@@ -779,7 +795,7 @@ export function ComponentsDemo() {
       <InputItemSection />
       <TextFieldSection />
       <KpiTileSection />
-      <TileSection />
+      <SpaceTileSection />
       <ColorRolesSection />
       <TokenSection />
     </div>

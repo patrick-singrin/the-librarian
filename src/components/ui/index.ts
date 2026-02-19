@@ -10,12 +10,6 @@ export type { CardProps, CardPadding } from './Card'
 export { Badge } from './Badge'
 export type { BadgeProps, BadgeVariant, BadgeType, BadgeSize } from './Badge'
 
-export { StatTile } from './StatTile'
-export type { StatTileProps, StatAlign } from './StatTile'
-
-export { WarnTile } from './WarnTile'
-export type { WarnTileProps } from './WarnTile'
-
 export { Indicator } from './Indicator'
 export type { IndicatorProps, IndicatorVariant, IndicatorSize } from './Indicator'
 
@@ -27,6 +21,9 @@ export type { TileProps, TileBadge } from './Tile'
 
 export { KpiTile } from './KpiTile'
 export type { KpiTileProps } from './KpiTile'
+
+export { SpaceTile } from './SpaceTile'
+export type { SpaceTileProps } from './SpaceTile'
 
 export { NavItem } from './NavItem'
 export type { NavItemProps } from './NavItem'
