@@ -1,12 +1,14 @@
 import { type ComponentType, type ReactNode } from 'react'
 import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
-import { Badge } from './Badge'
+import { Badge, type BadgeVariant, type BadgeType } from './Badge'
 import { Icon } from './Icon'
 import type { IndicatorVariant } from './Indicator'
 import { formatRelativeTime } from '../../utils/relativeTime'
 
 interface TileBadge {
   label: string
+  variant?: BadgeVariant
+  type?: BadgeType
   indicator?: IndicatorVariant
   icon?: ComponentType<PhosphorIconProps>
 }
@@ -20,8 +22,8 @@ interface TileProps {
   icon?: ComponentType<PhosphorIconProps>
   /** Optional badge config for the head row */
   badge?: TileBadge
-  /** Slot content */
-  children: ReactNode
+  /** Slot content (omit for header-only tiles like DocumentTile) */
+  children?: ReactNode
   /** Optional "Last updated" timestamp (epoch ms or Date) shown at the bottom */
   updatedAt?: number | Date | null
   className?: string
@@ -48,7 +50,7 @@ export function Tile({
 }: TileProps) {
   return (
     <article
-      className={`rounded-md border border-base-subtle-border-default bg-base-background-default p-4 shadow-xs ${className}`}
+      className={`rounded-md border border-base-subtle-border-default bg-base-background-default p-4 ${className}`}
     >
       {/* ── Head row (.tile-head) ── */}
       <header className={`flex justify-between ${subtitle ? 'items-start' : 'h-6 items-center'}`}>
@@ -64,16 +66,18 @@ export function Tile({
           </div>
         </div>
         {badge && (
-          <Badge variant="base" type="outline" size="xs" indicator={badge.indicator} icon={badge.icon}>
+          <Badge variant={badge.variant ?? 'base'} type={badge.type ?? 'outline'} size="xs" indicator={badge.indicator} icon={badge.icon}>
             {badge.label}
           </Badge>
         )}
       </header>
 
       {/* ── Slot ── */}
-      <div className="mt-4">
-        {children}
-      </div>
+      {children != null && (
+        <div className="mt-4">
+          {children}
+        </div>
+      )}
 
       {/* ── Footer: last updated ── */}
       {updatedAt != null && (

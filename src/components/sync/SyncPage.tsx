@@ -1,101 +1,247 @@
-import { useState } from 'react'
-import { ProgressBar } from 'react-aria-components'
-import { useSpaces, useCheckNew, useSync } from '../../hooks/useSyncStatus'
-import { useSpaceDocuments } from '../../hooks/useSpaceDocuments'
-import { Badge, Button, Tile, Indicator, Card, Select, SelectItem } from '../ui'
-import type { TileBadge } from '../ui'
-import { formatRelativeTime } from '../../utils/relativeTime'
-import { useTick } from '../../hooks/useTick'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  ChartBar,
-  Wrench,
-  MagnifyingGlass,
-  ArrowsClockwise,
-  Info,
+  Check,
   Database,
+  Info,
+  MagnifyingGlass,
+  Plus,
+  Scribble,
+  CircleNotch,
 } from '@phosphor-icons/react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useSpacesOverview, useCheckNew } from '../../hooks/useSyncStatus'
+import { useSyncStream, type SyncPhase } from '../../hooks/useSyncStream'
 import { useServiceHealth } from '../../hooks/useServiceHealth'
+import { Button, Dialog, DocumentTile, Indicator, ProgressBar, SpaceTile, Tile } from '../ui'
+import type { TileBadge } from '../ui'
+import type { DocSyncStatus } from '../ui/DocumentTile'
 import { SpacesTile } from './SpacesTile'
 
-const ALL_SPACES_KEY = '__all__'
-
 export function SyncPage() {
-  const [selectedSpace, setSelectedSpace] = useState<string>(ALL_SPACES_KEY)
+  const queryClient = useQueryClient()
   const [showModelInfo, setShowModelInfo] = useState(false)
-  const spaceId = selectedSpace === ALL_SPACES_KEY ? undefined : selectedSpace
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [isManualCheck, setIsManualCheck] = useState(false)
+  const [pipelineExpanded, setPipelineExpanded] = useState(false)
 
-  const spaces = useSpaces()
-  const checkNew = useCheckNew(spaceId)
-  const sync = useSync()
+  // Sync stream state
+  const stream = useSyncStream()
+
+  // Pause polling while streaming or showing completion (avoid races with RAG API settling)
+  const paused = stream.phase !== 'idle'
+
+  const spacesOverview = useSpacesOverview(paused)
+  const checkNew = useCheckNew(undefined, paused)
   const rag = useServiceHealth('rag')
-  const spaceDocuments = useSpaceDocuments(spaceId)
 
-  // Keep relative timestamps fresh
-  useTick(60_000)
+  const spacesList = useMemo(() => spacesOverview.data?.spaces ?? [], [spacesOverview.data?.spaces])
 
-  const totalDocs = checkNew.data?.total_in_paperless ?? null
-  const totalIndexed = checkNew.data?.total_indexed ?? null
-  const newCount = checkNew.data?.new_count ?? null
-
-  const syncPercent =
-    totalDocs != null && totalIndexed != null && totalDocs > 0
-      ? Math.round((totalIndexed / totalDocs) * 100)
-      : 0
+  const newCount = checkNew.data?.new_count ?? 0
+  const newDocs = useMemo(() => checkNew.data?.new_documents ?? [], [checkNew.data?.new_documents])
+  const isFullySynced = checkNew.data != null && newCount === 0 && stream.phase !== 'completed'
+  const loading = checkNew.isLoading
 
   const embeddingModel = checkNew.data?.embedding_model ?? null
-  const llmModel = checkNew.data?.llm_model ?? null
   const embeddingAvailable = checkNew.data?.embedding_available ?? false
-  const llmAvailable = checkNew.data?.llm_available ?? false
 
-  const unassignedCount = checkNew.data?.unassigned_count ?? 0
+  // Check for running sync on mount (navigation-away case)
+  useEffect(() => {
+    stream.checkRunningSync()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const newDocs = checkNew.data?.new_documents ?? []
-  const isFullySynced = checkNew.data != null && newCount === 0
-  const loading = checkNew.isLoading
-  const spacesList = spaces.data ?? []
-  const hasSpaces = spacesList.length > 0
+  // ── Section 1: Space tile data ──────────────────────────────────────────
+  // During streaming, add deltas from the stream to the cached overview stats
+  const liveSpaceData = useMemo(() => {
+    return spacesList.map((entry) => {
+      const delta = stream.indexedBySpace.get(entry.slug) ?? 0
+      return {
+        space: { slug: entry.slug, name: entry.name },
+        indexed: entry.indexed + delta,
+        total: entry.total,
+      }
+    })
+  }, [spacesList, stream.indexedBySpace])
 
-  // Tile header badge — shows sync state at a glance
-  const statusBadge: TileBadge | undefined = loading
-    ? undefined
-    : isFullySynced
-      ? { label: 'Synced', indicator: 'success' }
-      : newCount != null
-        ? { label: `${newCount} missing`, indicator: 'warning' }
-        : undefined
+  // ── Section 3: Progress bar values ──────────────────────────────────────
+  const progressValue = stream.phase === 'idle'
+    ? 0
+    : stream.indexedCount + stream.failedCount
+
+  const progressTotal = stream.phase === 'idle'
+    ? newCount
+    : stream.total
+
+  // ── Section 3: RAG Ingest Tool badge ────────────────────────────────────
+  const toolBadge: TileBadge | undefined = (() => {
+    if (loading) return undefined
+    if (stream.phase === 'streaming') return { label: 'Ingesting', indicator: 'info' as const }
+    if (stream.phase === 'completed') {
+      if (stream.error || (stream.result && stream.result.failed_count > 0)) {
+        return { label: 'Warning', indicator: 'warning' as const }
+      }
+      return { label: 'Synced', indicator: 'success' as const }
+    }
+    if (isFullySynced) return { label: 'Synced', indicator: 'success' as const }
+    if (newCount > 0) return { label: 'Pending', indicator: 'warning' as const }
+    return undefined
+  })()
+
+  // ── Section 3: Button state ─────────────────────────────────────────────
+  const isCompleted = stream.phase === 'completed'
+  const buttonDisabled = stream.isStreaming || (stream.phase === 'idle' && newCount === 0)
+  const buttonLabel = stream.isStreaming
+    ? 'Ingesting…'
+    : isCompleted
+      ? 'Continue'
+      : 'Start Ingestion'
+
+  // ── Section 3: Pipeline — build the doc list ────────────────────────────
+  // During streaming, we use the stream's doc list (with live status)
+  // During idle, we use checkNew's new_documents
+  const pipelineDocs = useMemo(() => {
+    if (stream.phase !== 'idle' && stream.docs.length > 0) {
+      return stream.docs.map((d) => ({
+        id: d.doc_id,
+        title: d.title,
+        spaces: d.spaces,
+        syncStatus: d.status as DocSyncStatus,
+      }))
+    }
+    return newDocs.map((d) => ({
+      id: d.id,
+      title: d.title,
+      spaces: d.spaces,
+      syncStatus: undefined as DocSyncStatus | undefined,
+    }))
+  }, [stream.phase, stream.docs, newDocs])
+
+  // Determine pipeline visual state
+  const pipelineState = (() => {
+    if (loading) return 'loading' as const
+    if (stream.phase === 'streaming' || stream.phase === 'completed') return 'streaming' as const
+    if (pipelineDocs.length > 0) return 'queued' as const
+    if (isFullySynced) return 'synced' as const
+    return 'empty' as const
+  })()
 
   function handleSync() {
-    sync.mutate({ spaceId })
+    setPipelineExpanded(false)
+    stream.startSync()
   }
 
-  function handleSyncOne(docId: number) {
-    sync.mutate({ docIds: [docId], spaceId })
+  function handleManualCheck() {
+    setIsManualCheck(true)
+    checkNew.refetch().finally(() => setIsManualCheck(false))
+  }
+
+  // Derive the "checking" visual state — only true for user-initiated checks
+  const isCheckingNew = isManualCheck && checkNew.isFetching
+
+  // Manual reset — optimistically patch the cache so the UI updates instantly
+  function handleAcknowledge() {
+    // Patch spaces-overview: apply stream deltas to cached baseline
+    queryClient.setQueryData<import('../../types/api').SpacesOverview>(
+      ['rag-spaces-overview'],
+      (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          spaces: old.spaces.map((entry) => {
+            const delta = stream.indexedBySpace.get(entry.slug) ?? 0
+            const indexed = entry.indexed + delta
+            return { ...entry, indexed, newCount: Math.max(0, entry.newCount - delta) }
+          }),
+        }
+      },
+    )
+
+    // Patch check-new: clear the pipeline queue
+    queryClient.setQueryData<import('../../types/api').CheckNewResponse>(
+      ['rag-check-new', undefined],
+      (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          new_count: 0,
+          new_documents: [],
+          total_indexed: old.total_indexed + stream.indexedCount,
+        }
+      },
+    )
+
+    stream.reset()
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      {/* Header with space selector */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-base-foreground-default">RAG Tool</h2>
-        {hasSpaces && (
-          <Select
-            aria-label="Select space"
-            selectedKey={selectedSpace}
-            onSelectionChange={(key) => setSelectedSpace(key as string)}
+    <div className="flex flex-col gap-6">
+      {/* ── Section 1: Spaces — edge-to-edge white background ── */}
+      <div className="-mx-6 -mt-6 bg-base-background-default px-6 pb-6 pt-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-base-foreground-default">
+            Spaces
+            <span className="text-xl font-light text-base-foreground-default">
+              ({spacesList.length})
+            </span>
+          </h2>
+          <Button
+            variant="primary-outline"
+            size="sm"
+            iconLeft={Plus}
+            onPress={() => setDialogOpen(true)}
           >
-            <SelectItem id={ALL_SPACES_KEY} textValue="All Spaces">
-              All Spaces
-            </SelectItem>
-            {spacesList.map((s) => (
-              <SelectItem key={s.slug} id={s.slug} textValue={s.name}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </Select>
+            Add new Space
+          </Button>
+        </div>
+
+        {/* Space tiles — horizontal scroll */}
+        {spacesList.length > 0 && (
+          <div className="mt-4 flex gap-4 overflow-x-auto">
+            {liveSpaceData.map(({ space, indexed, total }) => {
+              const synced = total > 0 && indexed >= total
+              const isSyncing = stream.isStreaming && (stream.indexedBySpace.get(space.slug) ?? 0) > 0
+
+              const badge: TileBadge = isSyncing
+                ? { label: 'Ingesting', indicator: 'info' }
+                : synced
+                  ? { label: 'Synced', indicator: 'success' }
+                  : { label: 'Pending', indicator: 'warning' }
+
+              return (
+                <SpaceTile
+                  key={space.slug}
+                  title={space.name}
+                  subtitle={space.slug}
+                  badge={badge}
+                  indexed={indexed}
+                  total={total}
+                  onOpenSpace={() => {}}
+                  className="w-[336px] shrink-0"
+                />
+              )
+            })}
+          </div>
+        )}
+
+        {spacesList.length === 0 && !spacesOverview.isLoading && (
+          <p className="mt-4 text-sm text-base-subtle-foreground-default">
+            No spaces defined yet. Create one to start indexing documents.
+          </p>
         )}
       </div>
 
-      {/* Embedding model requirement */}
+      {/* Create Space Dialog */}
+      <Dialog isOpen={dialogOpen} onOpenChange={setDialogOpen} title="New Space">
+        <SpacesTile
+          renderMode="bare"
+          formOpen={dialogOpen}
+          onFormClose={() => setDialogOpen(false)}
+          hideAddButton
+        />
+      </Dialog>
+
+      {/* ── Section 2: Embedding Model Banner ── */}
       {embeddingModel && (
         <div className="flex flex-col gap-2 rounded-lg border border-primary-subtle-border-default bg-primary-subtle-background-default px-3 py-2.5">
           <div className="flex items-center gap-2">
@@ -137,7 +283,8 @@ export function SyncPage() {
         </div>
       )}
 
-      {checkNew.error && (
+      {/* Error states (from checkNew — only shown when idle) */}
+      {stream.phase === 'idle' && checkNew.error && (
         rag.isStarting ? (
           <div role="status" className="rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
             {rag.message}
@@ -149,225 +296,157 @@ export function SyncPage() {
         )
       )}
 
-      {/* ── Section 1: Status ── */}
-      <Tile title="Status" icon={ChartBar} badge={statusBadge} updatedAt={checkNew.dataUpdatedAt || null}>
+      {/* ── Section 3: RAG Ingest Tool ── */}
+      <Tile title="RAG Ingest Tool" icon={Database} badge={toolBadge}>
         <div className="flex flex-col gap-4">
-          {/* Hero: indexed count + progress */}
-          <div className="flex flex-col items-center rounded-lg bg-base-subtle-background-default px-4 py-5">
-            <span className="pt-2 pb-1 text-[30px] font-semibold leading-9 text-base-foreground-default">
-              {loading ? '…' : (
-                <>
-                  {totalIndexed?.toLocaleString('en-US')}{' '}
-                  <span className="text-base font-normal text-base-subtle-foreground-default">
-                    / {totalDocs?.toLocaleString('en-US')}
-                  </span>
-                </>
-              )}
-            </span>
+          {/* Progress + Action row */}
+          <div className="flex items-center gap-8">
+            <ProgressBar
+              label="Processed"
+              value={progressValue}
+              total={progressTotal}
+              className="flex-1"
+            />
+            <Button
+              variant={isCompleted ? 'base-outline' : 'primary-solid'}
+              size="sm"
+              iconLeft={stream.isStreaming ? CircleNotch : isCompleted ? Check : Scribble}
+              onPress={isCompleted ? handleAcknowledge : handleSync}
+              isDisabled={buttonDisabled}
+            >
+              {buttonLabel}
+            </Button>
+          </div>
 
-            {/* Progress bar */}
-            <div className="mt-4 w-full">
-              <ProgressBar
-                value={syncPercent}
-                minValue={0}
-                maxValue={100}
-                aria-label="Sync progress"
-                className="flex flex-col gap-1"
-              >
-                {({ percentage, valueText }) => (
-                  <>
-                    <div className="flex justify-between text-xs text-base-subtle-foreground-default">
-                      <span>Indexed</span>
-                      <span>{valueText}</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-base-background-default">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          isFullySynced
-                            ? 'bg-success-p-background-default'
-                            : 'bg-primary-p-background-default'
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </>
-                )}
-              </ProgressBar>
-            </div>
+          {/* Sync feedback banners */}
+          <SyncBanner phase={stream.phase} stream={stream} />
 
-            {/* Info note */}
-            {!spaceId && hasSpaces && (
-              <p className="mt-3 text-center text-[11px] text-base-subtle-foreground-default">
-                Only documents assigned to a space are indexed
-              </p>
+          {/* Pipeline container */}
+          <div className="rounded-md bg-base-subtle-background-default p-4">
+            {/* Loading state */}
+            {pipelineState === 'loading' && (
+              <div className="flex items-center justify-center py-6">
+                <p className="text-sm text-base-subtle-foreground-default">Loading…</p>
+              </div>
+            )}
+
+            {/* Queued / streaming documents */}
+            {(pipelineState === 'queued' || pipelineState === 'streaming') && pipelineDocs.length > 0 && (() => {
+              const PREVIEW_LIMIT = 10
+              const isQueued = pipelineState === 'queued'
+              const showAll = !isQueued || pipelineExpanded
+              const visibleDocs = showAll ? pipelineDocs : pipelineDocs.slice(0, PREVIEW_LIMIT)
+              const hiddenCount = pipelineDocs.length - PREVIEW_LIMIT
+
+              return (
+                <div className="flex flex-col gap-2.5">
+                  <ul className={`flex flex-col gap-2.5 ${showAll ? 'max-h-[480px] overflow-y-auto' : ''}`}>
+                    {visibleDocs.map((doc) => (
+                      <li key={doc.id}>
+                        <DocumentTile
+                          title={doc.title}
+                          documentId={doc.id}
+                          spaceName={doc.spaces[0] ? (spacesList.find((s) => s.slug === doc.spaces[0])?.name ?? doc.spaces[0]) : undefined}
+                          syncStatus={doc.syncStatus}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  {isQueued && hiddenCount > 0 && (
+                    <Button
+                      variant="primary-ghost"
+                      size="sm"
+                      onPress={() => setPipelineExpanded((v) => !v)}
+                      className="self-center"
+                    >
+                      {pipelineExpanded ? 'Show less' : `Show all ${pipelineDocs.length} documents`}
+                    </Button>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Empty queue */}
+            {pipelineState === 'empty' && (
+              <div className="flex flex-col items-center gap-3 py-6">
+                <p className="text-sm text-base-subtle-foreground-default">
+                  There are no documents in the queue.
+                </p>
+                <Button
+                  variant="base-outline"
+                  size="sm"
+                  iconLeft={MagnifyingGlass}
+                  onPress={handleManualCheck}
+                  isDisabled={isCheckingNew}
+                >
+                  {isCheckingNew ? 'Checking…' : 'Check for new documents'}
+                </Button>
+              </div>
+            )}
+
+            {/* Fully synced */}
+            {pipelineState === 'synced' && (
+              <div className="flex flex-col items-center gap-3 rounded-md bg-success-subtle-background-default py-6">
+                <p className="text-sm font-medium text-success-foreground-default">
+                  All documents have been processed
+                </p>
+                <Button
+                  variant="base-outline"
+                  size="sm"
+                  iconLeft={MagnifyingGlass}
+                  onPress={handleManualCheck}
+                  isDisabled={isCheckingNew}
+                >
+                  {isCheckingNew ? 'Checking…' : 'Check for new documents'}
+                </Button>
+              </div>
             )}
           </div>
-
-          {/* Model info */}
-          <div className="flex flex-wrap gap-x-6 gap-y-1">
-            <span className="inline-flex items-center gap-1.5 text-xs text-base-subtle-foreground-default">
-              <Indicator variant={embeddingAvailable ? 'success' : 'error'} size="xs" />
-              <span className="font-light">Embedding:</span>
-              <span className="font-medium text-base-foreground-default">{embeddingModel ?? '–'}</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs text-base-subtle-foreground-default">
-              <Indicator variant={llmAvailable ? 'success' : 'error'} size="xs" />
-              <span className="font-light">LLM:</span>
-              <span className="font-medium text-base-foreground-default">{llmModel ?? '–'}</span>
-            </span>
-          </div>
-
-          {/* Unassigned documents hint */}
-          {!loading && hasSpaces && !spaceId && unassignedCount > 0 && (
-            <div className="flex items-start gap-2 rounded-lg border border-base-border-default bg-base-subtle-background-default px-3 py-2.5">
-              <Info size={16} weight="regular" className="mt-px shrink-0 text-base-subtle-foreground-default" />
-              <span className="text-xs text-base-subtle-foreground-default">
-                <span className="font-medium text-base-foreground-default">{unassignedCount.toLocaleString('en-US')}</span>
-                {' '}document{unassignedCount !== 1 ? 's' : ''} in Paperless without a RAG space — these are not indexed.
-              </span>
-            </div>
-          )}
         </div>
       </Tile>
-
-      {/* ── Section 2: Indexed Documents (space detail view) ── */}
-      {spaceId && (
-        <Tile
-          title="Indexed Documents"
-          icon={Database}
-          badge={
-            spaceDocuments.data
-              ? { label: `${spaceDocuments.data.total}`, indicator: 'info' as const }
-              : undefined
-          }
-          updatedAt={spaceDocuments.dataUpdatedAt || null}
-        >
-          {spaceDocuments.isLoading && !spaceDocuments.data ? (
-            <p className="text-sm text-base-subtle-foreground-default">Loading…</p>
-          ) : spaceDocuments.error ? (
-            <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-3 text-sm text-error-foreground-default">
-              Unable to load indexed documents: {spaceDocuments.error.message}
-            </div>
-          ) : spaceDocuments.data && spaceDocuments.data.documents.length === 0 ? (
-            <p className="text-sm text-base-subtle-foreground-default">
-              No documents indexed in this space.
-            </p>
-          ) : spaceDocuments.data ? (
-            <ul className="flex flex-col gap-1">
-              {spaceDocuments.data.documents.map((doc) => (
-                <li key={doc.doc_id}>
-                  <Card padding="sm" className="flex items-center gap-3 !py-2">
-                    <span className="min-w-0 flex-1 truncate text-sm text-base-foreground-default">
-                      <span className="font-medium">#{doc.doc_id}</span>
-                      <span className="ml-2">{doc.title}</span>
-                    </span>
-                    <Badge variant="base" type="outline" size="xs">
-                      {doc.chunk_count} chunk{doc.chunk_count !== 1 ? 's' : ''}
-                    </Badge>
-                    <span className="shrink-0 text-xs text-base-subtle-foreground-default">
-                      {doc.ingested_at ? formatRelativeTime(new Date(doc.ingested_at + 'Z').getTime()) : '–'}
-                    </span>
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </Tile>
-      )}
-
-      {/* ── Section 3: Tools ── */}
-      <Tile title="Tools" icon={Wrench}>
-        <div className="flex flex-col gap-4">
-          {/* Action buttons */}
-          <div className="flex gap-3">
-            <Button
-              variant="base-outline"
-              iconLeft={MagnifyingGlass}
-              onPress={() => checkNew.refetch()}
-              isDisabled={checkNew.isFetching}
-            >
-              {checkNew.isFetching ? 'Checking…' : 'Check for New'}
-            </Button>
-            <Button
-              variant="primary-solid"
-              iconLeft={ArrowsClockwise}
-              onPress={handleSync}
-              isDisabled={sync.isPending || isFullySynced}
-            >
-              {sync.isPending ? 'Syncing…' : 'Sync All'}
-            </Button>
-          </div>
-
-          {/* Sync feedback */}
-          {sync.error && (
-            <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-3 text-sm text-error-foreground-default">
-              Sync failed: {sync.error.message}
-            </div>
-          )}
-
-          {sync.data && (
-            <div role="status" className="rounded-lg border border-success-subtle-border-default bg-success-subtle-background-default p-3 text-sm text-success-foreground-default">
-              {sync.data.message} — {sync.data.indexed_count} indexed, {sync.data.total_chunks} chunks
-            </div>
-          )}
-
-          {/* Unindexed documents list (capped at 10) */}
-          {newDocs.length > 0 && (
-            <section aria-label="Unindexed documents">
-              <h4 className="mb-2 text-xs font-medium text-base-subtle-foreground-default">
-                {newDocs.length} unindexed document{newDocs.length !== 1 ? 's' : ''}
-              </h4>
-              <ul className="flex flex-col gap-1">
-                {newDocs.slice(0, 10).map((doc) => (
-                  <li key={doc.id}>
-                    <Card padding="sm" className="flex items-center gap-3 !py-2">
-                      <span className="min-w-0 flex-1 truncate text-sm text-base-foreground-default">
-                        <span className="font-medium">#{doc.id}</span>
-                        <span className="ml-2">{doc.title}</span>
-                        <span className="ml-2 text-xs text-base-subtle-foreground-default">
-                          {new Date(doc.created).toLocaleDateString('en-US')}
-                        </span>
-                      </span>
-                      {doc.spaces.length > 0 && (
-                        <span className="flex shrink-0 gap-1">
-                          {doc.spaces.map((slug) => (
-                            <Badge key={slug} variant="primary" type="outline" size="xs" icon={Database}>
-                              {spacesList.find((s) => s.slug === slug)?.name ?? slug}
-                            </Badge>
-                          ))}
-                        </span>
-                      )}
-                      <Button
-                        variant="base-outline"
-                        size="sm"
-                        onPress={() => handleSyncOne(doc.id)}
-                        isDisabled={sync.isPending}
-                        className="shrink-0"
-                      >
-                        Sync
-                      </Button>
-                    </Card>
-                  </li>
-                ))}
-              </ul>
-              {newDocs.length > 10 && (
-                <p className="mt-2 text-xs text-base-subtle-foreground-default">
-                  and {newDocs.length - 10} more — use Sync All to index everything at once.
-                </p>
-              )}
-            </section>
-          )}
-
-          {checkNew.data && newDocs.length === 0 && (
-            <p role="status" className="text-sm text-base-subtle-foreground-default">
-              All documents are indexed.
-            </p>
-          )}
-        </div>
-      </Tile>
-
-      {/* ── Section 4: Spaces ── */}
-      <SpacesTile />
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Sync feedback banner (shown between progress bar and pipeline)
+// ---------------------------------------------------------------------------
+
+function SyncBanner({
+  phase,
+  stream,
+}: {
+  phase: SyncPhase
+  stream: { result: { indexed_count: number; failed_count: number; total_chunks: number } | null; error: string | null }
+}) {
+  if (phase !== 'completed') return null
+
+  // Error banner
+  if (stream.error) {
+    return (
+      <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-3 text-sm text-error-foreground-default">
+        Sync failed: {stream.error}
+      </div>
+    )
+  }
+
+  // Success / warning banner
+  if (stream.result) {
+    const hasFailures = stream.result.failed_count > 0
+    return (
+      <div
+        role="status"
+        className={`rounded-lg border p-3 text-sm ${
+          hasFailures
+            ? 'border-warning-subtle-border-default bg-warning-subtle-background-default text-warning-foreground-default'
+            : 'border-success-subtle-border-default bg-success-subtle-background-default text-success-foreground-default'
+        }`}
+      >
+        Sync complete — {stream.result.indexed_count} indexed, {stream.result.total_chunks} chunks
+        {hasFailures && `, ${stream.result.failed_count} failed`}
+      </div>
+    )
+  }
+
+  return null
 }

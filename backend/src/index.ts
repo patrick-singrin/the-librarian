@@ -7,11 +7,15 @@ import { metaRouter } from './routes/meta.js'
 import { overviewRouter } from './routes/overview.js'
 import { settingsRouter } from './routes/settings.js'
 import { startRagApi, stopRagApi } from './services/rag-process.js'
+import { attachSSE } from './services/event-bus.js'
 
 const app = express()
 
 app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }))
 app.use(express.json())
+
+// SSE event bus — frontend subscribes for real-time invalidation hints
+app.get('/api/events', (_req, res) => attachSSE(res))
 
 app.use('/api/health', healthRouter)
 app.use('/api/rag', ragRouter)

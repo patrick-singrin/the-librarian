@@ -1,8 +1,8 @@
 import { type ComponentType } from 'react'
 import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
 import { CaretRight } from '@phosphor-icons/react'
-import { ProgressBar } from 'react-aria-components'
 import { Tile, type TileBadge } from './Tile'
+import { ProgressBar } from './ProgressBar'
 import { Button } from './Button'
 
 interface SpaceTileProps {
@@ -24,16 +24,12 @@ interface SpaceTileProps {
 }
 
 /**
- * SpaceTile — Tile + .slot-element-space slot.
- *
- * Composes the base Tile (with optional subtitle) and a space sync-status slot
- * showing indexed/total fraction, a progress bar, and an action button.
+ * SpaceTile — Tile + progress bar + CTA footer.
  *
  * Matches Figma `space-tile` component (node 3778:3289).
  *
- * Progress bar color:
- *   - info (teal) when partially synced
- *   - success (green) when fully synced (indexed === total)
+ * Shows a progress bar directly below the header, and an "Open Space"
+ * button in a grey footer bar at the bottom edge of the card.
  */
 export function SpaceTile({
   title,
@@ -45,55 +41,15 @@ export function SpaceTile({
   onOpenSpace,
   className = '',
 }: SpaceTileProps) {
-  const percent = total > 0 ? Math.round((indexed / total) * 100) : 0
-  const isSynced = total > 0 && indexed >= total
-
   return (
     <Tile title={title} subtitle={subtitle} icon={icon} badge={badge} className={className}>
-      {/* ── .slot-element-space ── */}
-      <div className="flex flex-col gap-2 rounded-md bg-base-subtle-background-default p-2">
-        {/* Value: indexed / total */}
-        <div className="flex w-full items-center justify-center px-0 pt-6 pb-4">
-          <span className="text-center text-[30px] leading-9 text-base-foreground-default">
-            <span className="font-semibold">{indexed.toLocaleString('en-US')}</span>
-            <span className="font-light">/</span>
-            <span className="font-light">{total.toLocaleString('en-US')}</span>
-          </span>
-        </div>
+      {/* Progress bar — directly below header */}
+      <ProgressBar label="Processed" value={indexed} total={total} />
 
-        {/* Progress bar (React Aria) */}
-        <ProgressBar
-          value={percent}
-          minValue={0}
-          maxValue={100}
-          aria-label="Indexing progress"
-          className="flex flex-col gap-1"
-        >
-          {({ percentage, valueText }) => (
-            <>
-              <div className="flex justify-between text-xs text-base-subtle-foreground-default">
-                <span>Indexed</span>
-                <span>{valueText}</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-base-background-default">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    isSynced
-                      ? 'bg-success-p-background-default'
-                      : 'bg-info-p-background-default'
-                  }`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </>
-          )}
-        </ProgressBar>
-      </div>
-
-      {/* Action button */}
+      {/* CTA footer — grey bar at bottom edge of card */}
       {onOpenSpace && (
-        <div className="mt-2 flex justify-end">
-          <Button variant="base-outline" size="sm" iconRight={CaretRight} onPress={onOpenSpace}>
+        <div className="-mx-4 -mb-4 mt-4 flex items-center justify-end rounded-b-md bg-base-subtle-background-default px-4 py-2">
+          <Button variant="base-ghost" size="sm" iconLeft={CaretRight} onPress={onOpenSpace}>
             Open Space
           </Button>
         </div>

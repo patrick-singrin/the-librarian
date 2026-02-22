@@ -49,6 +49,24 @@ export async function ragSync(body?: unknown): Promise<unknown> {
   return res.json()
 }
 
+/**
+ * Start a streaming sync via the RAG API's /sync-stream SSE endpoint.
+ * Returns the raw Response so the caller can read its body as a stream.
+ * Timeout is 10 minutes (large doc sets can take a while).
+ */
+export async function ragSyncStream(body?: unknown): Promise<Response> {
+  const res = await ragFetch('/sync-stream', {
+    method: 'POST',
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(600000),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { detail?: string }).detail || `RAG API error: ${res.status}`)
+  }
+  return res
+}
+
 export async function ragIndexedDocuments(spaceId: string): Promise<unknown> {
   const res = await ragFetch(`/indexed-documents?space_id=${encodeURIComponent(spaceId)}`)
   if (!res.ok) throw new Error(`RAG API error: ${res.status}`)
@@ -81,6 +99,18 @@ export async function ragUpdateSpace(slug: string, body: unknown): Promise<unkno
 
 export async function ragDeleteSpace(slug: string): Promise<unknown> {
   const res = await ragFetch(`/spaces/${encodeURIComponent(slug)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { detail?: string }).detail || `RAG API error: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function ragWipeSpace(slug: string): Promise<unknown> {
+  const res = await ragFetch(`/spaces/${encodeURIComponent(slug)}/wipe`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(120000),
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error((err as { detail?: string }).detail || `RAG API error: ${res.status}`)

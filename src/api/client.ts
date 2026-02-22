@@ -42,6 +42,9 @@ export const api = {
 
   ragSpaces: () => request<import('../types/api.js').SpaceInfo[]>('/api/rag/spaces'),
 
+  ragSpacesOverview: () =>
+    request<import('../types/api.js').SpacesOverview>('/api/rag/spaces-overview'),
+
   ragCreateSpace: (body: import('../types/api.js').SpaceCreateRequest) =>
     request<import('../types/api.js').SpaceInfo[]>('/api/rag/spaces', {
       method: 'POST',
@@ -92,4 +95,25 @@ export const api = {
 
   localToolsInfo: () =>
     request<import('../types/api.js').LocalToolsInfo>('/api/settings/local-tools'),
+
+  /** Start a streaming sync. Returns the raw Response for ReadableStream access. */
+  ragSyncStream: async (docIds?: number[], spaceId?: string): Promise<Response> => {
+    const res = await fetch(`${BASE}/api/rag/sync/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...(docIds ? { doc_ids: docIds } : {}),
+        ...(spaceId ? { space_id: spaceId } : {}),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error((body as { error?: string }).error || `Request failed: ${res.status}`)
+    }
+    return res
+  },
+
+  /** Polling fallback: get current sync job state. */
+  ragSyncProgress: () =>
+    request<import('../types/api.js').SyncJobProgress>('/api/rag/sync/progress'),
 }

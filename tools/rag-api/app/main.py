@@ -1,5 +1,6 @@
 """FastAPI main application for Paperless RAG Q&A system."""
 
+import json
 import logging
 import os
 import sys
@@ -9,7 +10,7 @@ import asyncio
 
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 
@@ -660,6 +661,208 @@ async def sync_new_documents(
         raise HTTPException(status_code=500, detail=f"Sync error: {str(e)}")
 
 
+@app.post("/sync-stream")
+async def sync_stream(
+    request: dict = None,
+    qdrant: QdrantClient = Depends(get_qdrant_client),
+    embedder: SentenceTransformer = Depends(get_embedding_model),
+):
+    """Stream-based sync: indexes documents and yields SSE events for each.
+
+    Emits three event types:
+      - sync:start   → { total, doc_ids, doc_meta: { [id]: { title, spaces } } }
+      - sync:progress → { doc_id, title, status, spaces, chunks_created,
+                          indexed_count, failed_count, total }
+      - sync:complete → { indexed_count, failed_count, total_chunks,
+                          indexed_documents, failed_documents }
+
+    Request body is identical to POST /sync:
+      { "doc_ids": [...], "space_id": "slug" }
+    """
+
+    # --- Validate embedding model upfront (before streaming) ----------------
+    try:
+        embedder.encode(["test"])
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Embedding model not available: {str(e)}",
+        )
+
+    # --- Resolve which docs to index (same logic as /sync) ------------------
+    sync_space_id = (request or {}).get("space_id")
+    logger.info(f"Starting sync-stream (space_id={sync_space_id})")
+
+    try:
+        requested_doc_ids = None
+        if request and "doc_ids" in request:
+            requested_doc_ids = set(request["doc_ids"])
+
+        docs_response = await list_documents(page_size=10000)
+        paperless_docs = docs_response.get("results", [])
+
+        # Build id → metadata lookup for title / spaces
+        # Only include docs that have at least one valid space assignment
+        # (same logic as check-new)
+        doc_lookup = {}
+        paperless_doc_ids = set()
+        for doc in paperless_docs:
+            slugs = get_document_spaces(doc)
+            if not slugs:
+                continue
+            if sync_space_id and sync_space_id not in slugs:
+                continue
+            doc_lookup[doc["id"]] = {
+                "title": doc.get("title", f"Document {doc['id']}"),
+                "spaces": slugs,
+            }
+            paperless_doc_ids.add(doc["id"])
+
+        # Get already-indexed doc IDs from Qdrant
+        from qdrant_client.http.models import Filter as QFilter, FieldCondition as QFC, MatchAny as QMA
+        indexed_doc_ids = set()
+        offset = None
+        scroll_filter = None
+        if sync_space_id:
+            scroll_filter = QFilter(must=[QFC(key="space_ids", match=QMA(any=[sync_space_id]))])
+
+        while True:
+            result = qdrant.scroll(
+                collection_name=settings.COLLECTION_NAME,
+                limit=100,
+                offset=offset,
+                scroll_filter=scroll_filter,
+                with_payload=True,
+                with_vectors=False,
+            )
+            points, next_offset = result
+            for point in points:
+                doc_id = point.payload.get("doc_id")
+                if doc_id:
+                    indexed_doc_ids.add(doc_id)
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        # Determine docs to index
+        if requested_doc_ids:
+            docs_to_index = (requested_doc_ids & paperless_doc_ids) - indexed_doc_ids
+        else:
+            docs_to_index = paperless_doc_ids - indexed_doc_ids
+
+        sorted_doc_ids = sorted(docs_to_index)
+
+    except Exception as e:
+        logger.error(f"Sync-stream setup failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync setup error: {str(e)}")
+
+    # --- SSE generator ------------------------------------------------------
+    async def event_generator():
+        """Yield SSE-formatted events as the sync progresses."""
+
+        def sse(event: str, data: dict) -> str:
+            return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+        total = len(sorted_doc_ids)
+
+        # Build doc_meta for all docs in this sync
+        doc_meta = {}
+        for did in sorted_doc_ids:
+            info = doc_lookup.get(did, {})
+            doc_meta[str(did)] = {
+                "title": info.get("title", f"Document {did}"),
+                "spaces": info.get("spaces", []),
+            }
+
+        # --- sync:start ---
+        yield sse("sync:start", {
+            "total": total,
+            "doc_ids": sorted_doc_ids,
+            "doc_meta": doc_meta,
+        })
+
+        if total == 0:
+            yield sse("sync:complete", {
+                "indexed_count": 0,
+                "failed_count": 0,
+                "total_chunks": 0,
+                "indexed_documents": [],
+                "failed_documents": [],
+            })
+            return
+
+        indexed_docs = []
+        skipped_docs = []
+        failed_docs = []
+        total_chunks = 0
+
+        for doc_id in sorted_doc_ids:
+            meta = doc_lookup.get(doc_id, {})
+            title = meta.get("title", f"Document {doc_id}")
+            spaces = meta.get("spaces", [])
+
+            try:
+                result = await ingest_document(
+                    doc_id=doc_id,
+                    qdrant_client=qdrant,
+                    embedding_model=embedder,
+                    force_reindex=False,
+                )
+
+                if result["status"] == "success":
+                    indexed_docs.append(doc_id)
+                    chunks = result["chunks_created"]
+                    total_chunks += chunks
+                    status = "success"
+                    logger.info(f"✓ Indexed document {doc_id}")
+                else:
+                    # Already indexed (race condition) or no space — skip, don't fail
+                    skipped_docs.append(doc_id)
+                    chunks = 0
+                    status = "skipped"
+                    logger.info(f"⊘ Skipped document {doc_id}: {result.get('reason')}")
+
+            except Exception as e:
+                failed_docs.append(doc_id)
+                chunks = 0
+                status = "error"
+                logger.error(f"Failed to index document {doc_id}: {e}")
+
+            # --- sync:progress ---
+            yield sse("sync:progress", {
+                "doc_id": doc_id,
+                "title": title,
+                "status": status,
+                "spaces": spaces,
+                "chunks_created": chunks,
+                "indexed_count": len(indexed_docs),
+                "skipped_count": len(skipped_docs),
+                "failed_count": len(failed_docs),
+                "total": total,
+            })
+
+        # --- sync:complete ---
+        yield sse("sync:complete", {
+            "indexed_count": len(indexed_docs),
+            "skipped_count": len(skipped_docs),
+            "failed_count": len(failed_docs),
+            "total_chunks": total_chunks,
+            "indexed_documents": indexed_docs,
+            "skipped_documents": skipped_docs,
+            "failed_documents": failed_docs,
+        })
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.get("/documents/search")
 async def search_documents(
     q: str,
@@ -985,6 +1188,56 @@ async def delete_space(slug: str):
     save_spaces_config(config["spaces"])
     logger.info(f"Deleted space '{slug}'")
     return get_all_spaces_info()
+
+
+@app.post("/spaces/{slug}/wipe")
+async def wipe_space(
+    slug: str,
+    qdrant: QdrantClient = Depends(get_qdrant_client),
+):
+    """Delete all indexed chunks belonging to a space from Qdrant.
+
+    The space config is preserved — only the vector data is removed,
+    so documents will appear as 'new' on the next check-new call.
+    """
+    from qdrant_client.http.models import Filter, FieldCondition, MatchAny
+
+    config = load_spaces_config()
+    if slug not in config["spaces"]:
+        raise HTTPException(status_code=404, detail=f"Space '{slug}' not found")
+
+    # Count points before deletion (for the response)
+    count_before = 0
+    offset = None
+    scroll_filter = Filter(
+        must=[FieldCondition(key="space_ids", match=MatchAny(any=[slug]))]
+    )
+    while True:
+        points, next_offset = qdrant.scroll(
+            collection_name=settings.COLLECTION_NAME,
+            limit=100,
+            offset=offset,
+            scroll_filter=scroll_filter,
+            with_payload=False,
+            with_vectors=False,
+        )
+        count_before += len(points)
+        if next_offset is None:
+            break
+        offset = next_offset
+
+    # Delete all matching points
+    qdrant.delete(
+        collection_name=settings.COLLECTION_NAME,
+        points_selector=scroll_filter,
+    )
+
+    logger.warning(f"Wiped space '{slug}': deleted {count_before} chunks from Qdrant")
+    return {
+        "space": slug,
+        "chunks_deleted": count_before,
+        "message": f"All indexed data for space '{slug}' has been removed. Documents will appear as new on next check.",
+    }
 
 
 @app.get("/")

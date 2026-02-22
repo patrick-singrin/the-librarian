@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLocation, Outlet } from 'react-router-dom'
 import { Button as AriaButton } from 'react-aria-components'
-import { Books, Tag, Circuitry, BracketsCurly, Sliders, ArrowLineLeft, ArrowLineRight } from '@phosphor-icons/react'
+import { Books, Files, Circuitry, Sliders, ArrowLineLeft, ArrowLineRight } from '@phosphor-icons/react'
 import { StatusBar } from './StatusBar'
 import { NavItem } from '../ui'
 
@@ -16,10 +16,9 @@ interface NavRoute {
 }
 
 const topRoutes: NavRoute[] = [
-  { to: '/', label: 'Overview', icon: Books },
-  { to: '/meta', label: 'Meta Data Tool', icon: Tag },
-  { to: '/sync', label: 'RAG Tool', icon: Circuitry },
-  { to: '/api', label: 'API Monitoring', icon: BracketsCurly, disabled: true },
+  { to: '/', label: 'Dashboard', icon: Books },
+  { to: '/meta', label: 'Paperless', icon: Files },
+  { to: '/sync', label: 'Knowledge', icon: Circuitry },
 ]
 
 const bottomRoutes: NavRoute[] = [

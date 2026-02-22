@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-aria-components'
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
+import { useEventBus } from './hooks/useEventBus'
 import { AppShell } from './components/layout/AppShell'
 import { HealthDashboard } from './components/health/HealthDashboard'
 import { SyncPage } from './components/sync/SyncPage'
@@ -27,6 +28,9 @@ const persister = createSyncStoragePersister({
 
 function InnerApp() {
   const navigate = useNavigate()
+
+  // Subscribe to backend SSE event bus for real-time query invalidation
+  useEventBus()
 
   return (
     <RouterProvider navigate={navigate}>

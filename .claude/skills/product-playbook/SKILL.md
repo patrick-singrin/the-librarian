@@ -57,11 +57,9 @@ Build a new reusable UI component for `src/components/ui/`.
 - Export both the component and its types
 - NEVER modify any existing component file
 
-**With Figma:**
-- Use `get_node_info` on the target node to extract dimensions, padding, gap, border-radius, fills, strokes
-- Use `scan_text_nodes` for typography specs (family, size, weight, line-height)
-- Map every Figma fill/stroke color to the nearest `--color-*` token. See `references/design-system.md`.
-- If a Figma color has no matching token, report the gap to the user
+**With Figma (mandatory when Figma node is provided):**
+
+Follow the Figma Property Extraction protocol (see below) BEFORE writing any code.
 
 **Output:** Working `.tsx` file with typed props, token mapping comments, barrel export update.
 
@@ -86,6 +84,10 @@ Build a page or feature section by composing existing components and hooks.
 - Handle all 5 states for data-driven components: loading, empty, populated, error, stale/refreshing.
 - Never modify existing `ui/` component definitions to fit new usage. Propose a new variant or new component instead.
 - All user-facing text in German.
+
+**With Figma (mandatory when Figma node is provided):**
+
+Follow the Figma Property Extraction protocol (see below) BEFORE writing any code. This applies to the page layout AND to every component instance used within it — do not assume existing components already match Figma. Verify each one.
 
 ### prototype
 
@@ -148,6 +150,73 @@ Discuss architecture, design, and UX decisions with full project context.
 - **UX patterns**: State handling for flows, error surfacing strategies, loading approaches
 - **Data layer**: Polling vs. push, derived hooks vs. separate queries, cache invalidation
 - **Figma ↔ Code drift**: Missing tokens, unimplemented components, spec mismatches
+
+## Figma Property Extraction Protocol
+
+**MANDATORY** for `create-component` and `create-ui` when a Figma node is provided. This is the single biggest source of implementation bugs — never skip it.
+
+### Core rule: Never assume, always extract
+
+Do NOT carry forward padding, gap, shadow, border-radius, font-weight, size, or variant values from existing code or from memory. Every property must come from Figma node data for the specific design being implemented.
+
+Common traps:
+- Reusing a component that has `shadow-xs` when Figma shows no shadow
+- Assuming `p-4` because "cards always have 16px padding"
+- Keeping a button's default size when Figma specifies `sm`
+- Using `base-outline` variant when Figma shows a ghost (transparent) button
+- Using `gap-1` because "list items are usually tight" when Figma shows 10px
+
+### Step 1: Extract property table (before writing code)
+
+For every distinct element in the Figma design, call `get_node_info` and produce a table:
+
+```
+| Element | Property | Figma value | Tailwind | Source node |
+|---------|----------|-------------|----------|-------------|
+| SpaceTile | padding | 16px | p-4 | 58:1045 |
+| SpaceTile | shadow | none | (omit) | 58:1045 |
+| SpaceTile | border-radius | 6px | rounded-md | 58:1045 |
+| SpaceTile | CTA bg | #f1f5f9 | bg-base-subtle-background-default | I58:1045;3789:1360 |
+| CTA button | variant | ghost (no fill/stroke) | base-ghost | I58:1045;3789:1348 |
+| Progress bar | text-bar gap | 2px | gap-0.5 | I58:1045;3778:3290 |
+| Doc tiles | inter-tile gap | 10px | gap-2.5 | 80:1963 |
+```
+
+**Derive values from absolute coordinates** when auto-layout data is not available:
+- Padding: `child.x - parent.x` for left, `child.y - parent.y` for top
+- Gap: `nextChild.y - (prevChild.y + prevChild.height)` for vertical gap
+- Inner width: `parent.width - 2 × horizontalPadding`
+
+### Step 2: Compare with existing component props
+
+For each UI component being used (`Tile`, `Button`, `ProgressBar`, `Badge`, etc.), check whether its **current defaults** match the Figma values from Step 1.
+
+If they differ, decide:
+- **Mismatch is component-wide** (e.g., Tile has `shadow-xs` but no Figma tile has shadow) → fix the component default
+- **Mismatch is instance-specific** (e.g., this button needs `sm` but the component defaults to `md`) → pass the correct prop at the call site
+
+Present mismatches to the user before making changes.
+
+### Step 3: Verify button/badge variants
+
+Buttons and badges are the most common source of variant errors. For each one:
+
+1. Check Figma `fills` and `strokes` on the button/badge node
+2. Match to the variant system:
+   - **solid**: has background fill, white text
+   - **outline**: transparent bg, colored border + text
+   - **ghost**: transparent bg, no border, colored text only
+3. Check the icon slot: `leading` = `iconLeft`, `trailing` = `iconRight`
+4. Derive size from Figma height: 28px = `sm`, 36px = `md`, 44px = `lg`
+
+### Step 4: Verify data semantics
+
+Check that the data shown in the Figma design matches the data you're binding:
+- What does the progress bar represent? (e.g., queue progress vs. overall indexed)
+- What does the badge label say? (e.g., "Pending" vs. "3 pending")
+- Does a heading or label exist in Figma, or is it code-only?
+
+If Figma shows "Processed 0/1" and you're binding `totalIndexed/totalDocs`, the semantics are wrong.
 
 ## Reference Files
 

@@ -35,7 +35,7 @@ export interface AskResponse {
 
 export interface CheckNewResponse {
   new_count: number
-  new_documents: Array<{ id: number; title: string; created: string; file_type: string; spaces: string[] }>
+  new_documents: Array<{ id: number; title: string; created?: string; file_type?: string; spaces: string[] }>
   total_in_paperless: number
   total_indexed: number
   unassigned_count: number
@@ -147,6 +147,23 @@ export interface RagProcessInfo {
   pathExists: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Spaces overview (single-call aggregate for space tiles)
+// ---------------------------------------------------------------------------
+
+export interface SpaceOverviewEntry {
+  slug: string
+  name: string
+  indexed: number
+  total: number
+  newCount: number
+}
+
+export interface SpacesOverview {
+  spaces: SpaceOverviewEntry[]
+  timestamp: string
+}
+
 export interface SpaceParams {
   chunk_tokens: number
   chunk_overlap: number
@@ -180,4 +197,69 @@ export interface SpaceUpdateRequest {
 export interface LocalToolsInfo {
   ragApi: { path: string; exists: boolean }
   meta: { path: string; exists: boolean }
+}
+
+// ---------------------------------------------------------------------------
+// Sync SSE types
+// ---------------------------------------------------------------------------
+
+export interface SyncStartEvent {
+  total: number
+  doc_ids: number[]
+  doc_meta: Record<string, { title: string; spaces: string[] }>
+}
+
+export interface SyncProgressEvent {
+  doc_id: number
+  title: string
+  status: 'success' | 'skipped' | 'error'
+  spaces: string[]
+  chunks_created: number
+  indexed_count: number
+  failed_count: number
+  total: number
+}
+
+export interface SyncCompleteEvent {
+  indexed_count: number
+  failed_count: number
+  total_chunks: number
+  indexed_documents: number[]
+  failed_documents: number[]
+}
+
+export interface SyncErrorEvent {
+  error: string
+}
+
+export type SyncSSEEvent =
+  | { event: 'sync:start'; data: SyncStartEvent }
+  | { event: 'sync:progress'; data: SyncProgressEvent }
+  | { event: 'sync:complete'; data: SyncCompleteEvent }
+  | { event: 'sync:error'; data: SyncErrorEvent }
+
+export interface SyncDocProgress {
+  doc_id: number
+  title: string
+  status: 'pending' | 'processing' | 'success' | 'skipped' | 'error'
+  spaces: string[]
+  chunks_created: number
+}
+
+export interface SyncJobProgress {
+  running: boolean
+  startedAt: string | null
+  total: number
+  indexedCount: number
+  failedCount: number
+  totalChunks: number
+  docs: SyncDocProgress[]
+  result: {
+    indexedDocuments: number[]
+    failedDocuments: number[]
+    indexedCount: number
+    failedCount: number
+    totalChunks: number
+  } | null
+  error: string | null
 }

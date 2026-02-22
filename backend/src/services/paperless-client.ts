@@ -26,6 +26,65 @@ export async function listDocumentsWithTag(tagId: number): Promise<unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Space ↔ Paperless: documents assigned via custom field "RAG Spaces" (ID 1)
+// ---------------------------------------------------------------------------
+
+const RAG_SPACES_FIELD_ID = 1
+
+export interface PaperlessSpaceDoc {
+  id: number
+  title: string
+  /** All space slugs this document belongs to */
+  spaces: string[]
+}
+
+/** Parse the "RAG Spaces" custom-field value into an array of slugs. */
+function parseSpaceSlugs(value: string): string[] {
+  if (!value || value === 'None') return []
+  return value.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
+/**
+ * Return Paperless documents that have the "RAG Spaces" custom field set.
+ * If `spaceSlug` is given, only documents belonging to that space are returned.
+ * Each document carries its full list of assigned spaces so the caller can
+ * properly attribute multi-space documents.
+ */
+export async function listDocumentsBySpace(spaceSlug?: string): Promise<{
+  count: number
+  documents: PaperlessSpaceDoc[]
+}> {
+  // Paperless filters: slug → icontains on JSON value, no slug → has_custom_fields
+  const filter = spaceSlug
+    ? `custom_fields__icontains=${encodeURIComponent(spaceSlug)}`
+    : `has_custom_fields=${RAG_SPACES_FIELD_ID}`
+  const data = (await paperlessFetch(
+    `/api/documents/?${filter}&fields=id,title,custom_fields&page_size=10000`,
+  )) as { count: number; results: Array<{ id: number; title: string; custom_fields: Array<{ field: number; value: string }> }> }
+
+  const enriched: PaperlessSpaceDoc[] = data.results
+    .map((doc) => {
+      const cf = doc.custom_fields.find((c) => c.field === RAG_SPACES_FIELD_ID)
+      return {
+        id: doc.id,
+        title: doc.title,
+        spaces: cf ? parseSpaceSlugs(cf.value) : [],
+      }
+    })
+    .filter((doc) => doc.spaces.length > 0)
+
+  // Post-filter: if a specific space was requested, only keep docs that belong to it
+  const filtered = spaceSlug
+    ? enriched.filter((doc) => doc.spaces.includes(spaceSlug))
+    : enriched
+
+  return {
+    count: filtered.length,
+    documents: filtered,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Overview / Statistics helpers
 // ---------------------------------------------------------------------------
 

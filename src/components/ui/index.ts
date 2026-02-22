@@ -22,8 +22,14 @@ export type { TileProps, TileBadge } from './Tile'
 export { KpiTile } from './KpiTile'
 export type { KpiTileProps } from './KpiTile'
 
+export { ProgressBar } from './ProgressBar'
+export type { ProgressBarProps } from './ProgressBar'
+
 export { SpaceTile } from './SpaceTile'
 export type { SpaceTileProps } from './SpaceTile'
+
+export { DocumentTile } from './DocumentTile'
+export type { DocumentTileProps } from './DocumentTile'
 
 export { NavItem } from './NavItem'
 export type { NavItemProps } from './NavItem'
@@ -42,4 +48,7 @@ export type { TextFieldProps } from './TextField'
 
 export { Select, SelectItem } from './Select'
 export type { SelectProps } from './Select'
+
+export { Dialog } from './Dialog'
+export type { DialogProps } from './Dialog'
 

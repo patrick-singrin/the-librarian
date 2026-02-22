@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import { toolPaths } from '../config.js'
+import { invalidate, notify } from './event-bus.js'
 
 interface MetaJob {
   running: boolean
@@ -48,6 +49,9 @@ export function runMetaEnrich(): MetaJob {
   child.on('close', (code) => {
     currentJob.running = false
     currentJob.exitCode = code
+    // Push instant update to frontend — documents may have new tags/metadata
+    invalidate('documents', 'rag-check-new')
+    notify(code === 0 ? 'Meta enrichment complete' : 'Meta enrichment finished with errors')
   })
 
   child.on('error', (err) => {

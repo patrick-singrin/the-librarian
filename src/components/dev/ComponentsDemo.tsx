@@ -28,7 +28,9 @@ import {
   type IndicatorVariant,
   type IndicatorSize,
   KpiTile,
+  ProgressBar,
   SpaceTile,
+  DocumentTile,
   Label,
   InputItem,
   TextField,
@@ -554,7 +556,7 @@ function SpaceTileSection() {
   return (
     <Section
       title="SpaceTile"
-      description="Per-space sync status tile with indexed/total fraction, progress bar, and action button."
+      description="Per-space sync tile with progress bar and action button in a grey footer."
     >
       <div>
         <ExampleRow label="partially synced">
@@ -598,6 +600,66 @@ function SpaceTileSection() {
             indexed={7}
             total={10}
           />
+        </ExampleRow>
+      </div>
+    </Section>
+  )
+}
+
+/* ────────────────────────────────────────────────────── *
+ *  ProgressBar
+ * ────────────────────────────────────────────────────── */
+
+function ProgressBarSection() {
+  return (
+    <Section
+      title="ProgressBar"
+      description="Reusable progress indicator with label, value fraction, and percentage. Teal when partial, green when complete."
+    >
+      <div className="max-w-sm">
+        <ExampleRow label="0% (empty)">
+          <ProgressBar label="Processed" value={0} total={2} />
+        </ExampleRow>
+        <ExampleRow label="50% (partial)">
+          <ProgressBar label="Processed" value={1} total={2} />
+        </ExampleRow>
+        <ExampleRow label="100% (complete)">
+          <ProgressBar label="Processed" value={2} total={2} />
+        </ExampleRow>
+        <ExampleRow label="large numbers">
+          <ProgressBar label="Indexed" value={8472} total={12000} />
+        </ExampleRow>
+      </div>
+    </Section>
+  )
+}
+
+/* ────────────────────────────────────────────────────── *
+ *  DocumentTile
+ * ────────────────────────────────────────────────────── */
+
+function DocumentTileSection() {
+  return (
+    <Section
+      title="DocumentTile"
+      description="Header-only card for document entries. Primary badge shows the space slug."
+    >
+      <div>
+        <ExampleRow label="with space badge">
+          <DocumentTile
+            title="Invoice Q4-2025.pdf"
+            documentId={1234}
+            spaceName="finance"
+          />
+        </ExampleRow>
+        <ExampleRow label="without space">
+          <DocumentTile
+            title="Unassigned Document"
+            documentId={5678}
+          />
+        </ExampleRow>
+        <ExampleRow label="minimal (title only)">
+          <DocumentTile title="Draft notes" />
         </ExampleRow>
       </div>
     </Section>
@@ -795,7 +857,9 @@ export function ComponentsDemo() {
       <InputItemSection />
       <TextFieldSection />
       <KpiTileSection />
+      <ProgressBarSection />
       <SpaceTileSection />
+      <DocumentTileSection />
       <ColorRolesSection />
       <TokenSection />
     </div>
