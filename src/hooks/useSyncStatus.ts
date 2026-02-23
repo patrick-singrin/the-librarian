@@ -1,10 +1,12 @@
 import { useQuery, useQueries, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { queryKeys } from '../api/queryKeys'
+import { invalidateSyncQueries, invalidateSpaceQueries } from '../api/invalidation'
 import type { SpaceCreateRequest, SpaceUpdateRequest } from '../types/api'
 
 export function useSpaces() {
   return useQuery({
-    queryKey: ['rag-spaces'],
+    queryKey: queryKeys.spaces.list,
     queryFn: api.ragSpaces,
     refetchInterval: 300_000, // spaces rarely change
     placeholderData: keepPreviousData,
@@ -14,7 +16,7 @@ export function useSpaces() {
 /** Single-call aggregate for space tiles — one query key, instant cache. */
 export function useSpacesOverview(paused = false) {
   return useQuery({
-    queryKey: ['rag-spaces-overview'],
+    queryKey: queryKeys.spaces.overview,
     queryFn: api.ragSpacesOverview,
     refetchInterval: paused ? false : 60_000,
     enabled: !paused,
@@ -24,7 +26,7 @@ export function useSpacesOverview(paused = false) {
 
 export function useCheckNew(spaceId?: string, paused = false) {
   return useQuery({
-    queryKey: ['rag-check-new', spaceId],
+    queryKey: queryKeys.sync.checkNewBySpace(spaceId),
     queryFn: () => api.ragCheckNew(spaceId),
     refetchInterval: paused ? false : 60_000,
     enabled: !paused,
@@ -42,7 +44,7 @@ export interface SpaceStats {
 export function useSpaceStats(slugs: string[], paused = false) {
   const results = useQueries({
     queries: slugs.map((slug) => ({
-      queryKey: ['rag-check-new', slug],
+      queryKey: queryKeys.sync.checkNewBySpace(slug),
       queryFn: () => api.ragCheckNew(slug),
       refetchInterval: paused ? false : 60_000,
       enabled: !paused,
@@ -70,11 +72,7 @@ export function useSync() {
   return useMutation({
     mutationFn: ({ docIds, spaceId }: { docIds?: number[]; spaceId?: string } = {}) =>
       api.ragSync(docIds, spaceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-spaces-overview'] })
-    },
+    onSuccess: () => invalidateSyncQueries(queryClient),
   })
 }
 
@@ -82,12 +80,7 @@ export function useCreateSpace() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: SpaceCreateRequest) => api.ragCreateSpace(body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rag-spaces'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-spaces-overview'] })
-    },
+    onSuccess: () => invalidateSpaceQueries(queryClient),
   })
 }
 
@@ -96,12 +89,7 @@ export function useUpdateSpace() {
   return useMutation({
     mutationFn: ({ slug, ...body }: SpaceUpdateRequest & { slug: string }) =>
       api.ragUpdateSpace(slug, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rag-spaces'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-spaces-overview'] })
-    },
+    onSuccess: () => invalidateSpaceQueries(queryClient),
   })
 }
 
@@ -109,11 +97,6 @@ export function useDeleteSpace() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (slug: string) => api.ragDeleteSpace(slug),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rag-spaces'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
-      queryClient.invalidateQueries({ queryKey: ['rag-spaces-overview'] })
-    },
+    onSuccess: () => invalidateSpaceQueries(queryClient),
   })
 }

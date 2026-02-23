@@ -1,6 +1,6 @@
 import { type ComponentType } from 'react'
 import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
-import { FileText, Database, CircleNotch, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { FileText, Database, CircleNotch, CheckCircle, XCircle, WarningCircle } from '@phosphor-icons/react'
 import { Tile, type TileBadge } from './Tile'
 
 export type DocSyncStatus = 'pending' | 'processing' | 'success' | 'skipped' | 'error'
@@ -16,6 +16,8 @@ interface DocumentTileProps {
   spaceName?: string
   /** Live sync status — shows spinner/check/error icon when set */
   syncStatus?: DocSyncStatus
+  /** Machine-readable reason for skip/failure from RAG API */
+  reason?: string
   className?: string
 }
 
@@ -23,7 +25,7 @@ const statusIcons: Record<DocSyncStatus, ComponentType<PhosphorIconProps> | null
   pending: null,
   processing: CircleNotch,
   success: CheckCircle,
-  skipped: CheckCircle,
+  skipped: WarningCircle,
   error: XCircle,
 }
 
@@ -31,7 +33,7 @@ const statusClasses: Record<DocSyncStatus, string> = {
   pending: '',
   processing: 'text-primary-foreground-default animate-spin',
   success: 'text-success-foreground-default',
-  skipped: 'text-base-subtle-foreground-default',
+  skipped: 'text-warning-foreground-default',
   error: 'text-error-foreground-default',
 }
 
@@ -41,6 +43,12 @@ const statusLabels: Record<DocSyncStatus, string> = {
   success: 'Indexed',
   skipped: 'Skipped',
   error: 'Failed',
+}
+
+const reasonLabels: Record<string, string> = {
+  already_exists: 'Already indexed',
+  no_spaces_assigned: 'No space assigned',
+  no_text_extracted: 'No text could be extracted',
 }
 
 /**
@@ -59,6 +67,7 @@ export function DocumentTile({
   icon = FileText,
   spaceName,
   syncStatus,
+  reason,
   className = '',
 }: DocumentTileProps) {
   const subtitle = documentId != null ? `#${documentId}` : undefined
@@ -73,6 +82,7 @@ export function DocumentTile({
     : undefined
 
   const StatusIcon = syncStatus ? statusIcons[syncStatus] : null
+  const reasonText = reason ? reasonLabels[reason] ?? reason : null
 
   return (
     <Tile title={title} subtitle={subtitle} icon={icon} badge={badge} className={className}>
@@ -80,7 +90,7 @@ export function DocumentTile({
         <div className="flex items-center gap-1.5 -mt-2">
           {StatusIcon && <StatusIcon size={14} weight="fill" className={statusClasses[syncStatus]} />}
           <span className={`text-xs ${syncStatus === 'error' ? 'text-error-foreground-default' : 'text-base-subtle-foreground-default'}`}>
-            {statusLabels[syncStatus]}
+            {statusLabels[syncStatus]}{reasonText ? ` \u2014 ${reasonText}` : ''}
           </span>
         </div>
       )}

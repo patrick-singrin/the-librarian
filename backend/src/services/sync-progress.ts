@@ -12,6 +12,8 @@ export interface SyncDocProgress {
   status: 'pending' | 'processing' | 'success' | 'skipped' | 'error'
   spaces: string[]
   chunks_created: number
+  /** Reason for skip/failure (e.g. "already_exists", "no_spaces_assigned") */
+  reason?: string
 }
 
 export interface SyncJobState {
@@ -86,6 +88,7 @@ export function onSyncProgress(data: {
   indexed_count: number
   failed_count: number
   total: number
+  reason?: string
 }): void {
   currentJob.indexedCount = data.indexed_count
   currentJob.failedCount = data.failed_count
@@ -95,6 +98,7 @@ export function onSyncProgress(data: {
   if (existing) {
     existing.status = data.status as SyncDocProgress['status']
     existing.chunks_created = data.chunks_created
+    if (data.reason) existing.reason = data.reason
   } else {
     currentJob.docs.set(data.doc_id, {
       doc_id: data.doc_id,
@@ -102,6 +106,7 @@ export function onSyncProgress(data: {
       status: data.status as SyncDocProgress['status'],
       spaces: data.spaces,
       chunks_created: data.chunks_created,
+      reason: data.reason,
     })
   }
 }
@@ -131,6 +136,11 @@ export function onSyncComplete(data: {
 export function onSyncError(message: string): void {
   currentJob.running = false
   currentJob.error = message
+}
+
+/** Clear the current sync state (called when the frontend acknowledges completion). */
+export function clearSyncJob(): void {
+  currentJob = freshState()
 }
 
 /** Return a JSON-safe snapshot of the current sync state. */

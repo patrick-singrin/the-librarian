@@ -73,16 +73,11 @@ export function SearchPage() {
         </div>
       </SearchField>
 
-      {search.error && (
-        rag.isStarting ? (
-          <div role="status" className="mt-4 rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
-            {rag.message}
-          </div>
-        ) : (
-          <div role="alert" className="mt-4 rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
-            Search failed: {search.error.message}
-          </div>
-        )
+      {/* Error — only for genuine unexpected failures (global banner handles RAG down/starting) */}
+      {search.error && !rag.isDown && !rag.isStarting && (
+        <div role="alert" className="mt-4 rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
+          Search failed: {search.error.message}
+        </div>
       )}
 
       {search.data && <ResultCard data={search.data} />}

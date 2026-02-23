@@ -22,6 +22,15 @@ export function getMetaStatus(): MetaJob {
   return { ...currentJob }
 }
 
+/** Clear stale job state after the frontend acknowledges completion. */
+export function clearMetaJob(): void {
+  currentJob.running = false
+  currentJob.startedAt = null
+  currentJob.output = ''
+  currentJob.error = ''
+  currentJob.exitCode = null
+}
+
 export function runMetaEnrich(): MetaJob {
   if (currentJob.running) {
     return { ...currentJob }
@@ -50,7 +59,7 @@ export function runMetaEnrich(): MetaJob {
     currentJob.running = false
     currentJob.exitCode = code
     // Push instant update to frontend — documents may have new tags/metadata
-    invalidate('documents', 'rag-check-new')
+    invalidate('meta-pending', 'rag-check-new')
     notify(code === 0 ? 'Meta enrichment complete' : 'Meta enrichment finished with errors')
   })
 

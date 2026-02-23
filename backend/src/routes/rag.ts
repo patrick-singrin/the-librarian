@@ -1,10 +1,16 @@
 import { Router } from 'express'
 import { ragAsk, ragStats, ragCheckNew, ragSync, ragSyncStream, ragIndexedDocuments, ragSpaces, ragCreateSpace, ragUpdateSpace, ragDeleteSpace, ragWipeSpace } from '../services/rag-client.js'
 import { listDocumentsBySpace, type PaperlessSpaceDoc } from '../services/paperless-client.js'
-import { startSyncJob, onSyncStart, onSyncProgress, onSyncComplete, onSyncError, getSyncProgress } from '../services/sync-progress.js'
+import { startSyncJob, onSyncStart, onSyncProgress, onSyncComplete, onSyncError, getSyncProgress, clearSyncJob } from '../services/sync-progress.js'
 import { invalidate } from '../services/event-bus.js'
 
 export const ragRouter = Router()
+
+// In-memory cache for spaces-overview — served when RAG API is unreachable.
+let spacesOverviewCache: {
+  spaces: Array<{ slug: string; name: string; indexed: number; total: number; newCount: number }>
+  timestamp: string
+} | null = null
 
 ragRouter.post('/ask', async (req, res) => {
   try {
@@ -230,6 +236,12 @@ ragRouter.get('/sync/progress', (_req, res) => {
   res.json(getSyncProgress())
 })
 
+/** Clear the stored sync state after the frontend acknowledges completion. */
+ragRouter.post('/sync/clear', (_req, res) => {
+  clearSyncJob()
+  res.json({ ok: true })
+})
+
 ragRouter.get('/indexed-documents', async (req, res) => {
   try {
     const spaceId = req.query.space_id as string | undefined
@@ -291,8 +303,19 @@ ragRouter.get('/spaces-overview', async (_req, res) => {
       }
     })
 
-    res.json({ spaces: result, timestamp: new Date().toISOString() })
+    const payload = { spaces: result, timestamp: new Date().toISOString() }
+    spacesOverviewCache = payload
+    res.json(payload)
   } catch (e) {
+    if (spacesOverviewCache) {
+      res.json({
+        ...spacesOverviewCache,
+        stale: true,
+        cachedAt: spacesOverviewCache.timestamp,
+        timestamp: new Date().toISOString(),
+      })
+      return
+    }
     res.status(502).json({ error: (e as Error).message })
   }
 })
@@ -309,6 +332,7 @@ ragRouter.get('/spaces', async (_req, res) => {
 ragRouter.post('/spaces', async (req, res) => {
   try {
     const result = await ragCreateSpace(req.body)
+    spacesOverviewCache = null
     invalidate('rag-spaces', 'rag-check-new', 'rag-spaces-overview')
     res.json(result)
   } catch (e) {
@@ -319,6 +343,7 @@ ragRouter.post('/spaces', async (req, res) => {
 ragRouter.put('/spaces/:slug', async (req, res) => {
   try {
     const result = await ragUpdateSpace(req.params.slug, req.body)
+    spacesOverviewCache = null
     invalidate('rag-spaces', 'rag-check-new', 'rag-spaces-overview')
     res.json(result)
   } catch (e) {
@@ -329,6 +354,7 @@ ragRouter.put('/spaces/:slug', async (req, res) => {
 ragRouter.delete('/spaces/:slug', async (req, res) => {
   try {
     const result = await ragDeleteSpace(req.params.slug)
+    spacesOverviewCache = null
     invalidate('rag-spaces', 'rag-check-new', 'rag-indexed-documents', 'rag-spaces-overview')
     res.json(result)
   } catch (e) {
@@ -339,6 +365,7 @@ ragRouter.delete('/spaces/:slug', async (req, res) => {
 ragRouter.post('/spaces/:slug/wipe', async (req, res) => {
   try {
     const result = await ragWipeSpace(req.params.slug)
+    spacesOverviewCache = null
     invalidate('rag-check-new', 'rag-indexed-documents', 'rag-spaces-overview')
     res.json(result)
   } catch (e) {

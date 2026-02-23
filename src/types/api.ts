@@ -103,6 +103,7 @@ export interface OverviewStats {
   }
 }
 
+/** @see backend/src/services/paperless-client.ts — `TimelineRange` (keep in sync manually) */
 export type TimelineRange = '30d' | '6m' | '12m'
 
 export interface TimelineBucket {
@@ -115,6 +116,7 @@ export interface TimelineResponse {
   buckets: TimelineBucket[]
 }
 
+/** @see backend/src/services/meta-runner.ts — `MetaJob` interface (keep in sync manually) */
 export interface MetaJob {
   running: boolean
   startedAt: string | null
@@ -140,6 +142,7 @@ export interface ConnectionTestResult {
   error?: string
 }
 
+/** @see backend/src/services/rag-process.ts — `RagProcessStatus` (keep in sync manually) */
 export type RagProcessStatus = 'running' | 'starting' | 'stopped'
 
 export interface RagProcessInfo {
@@ -162,6 +165,10 @@ export interface SpaceOverviewEntry {
 export interface SpacesOverview {
   spaces: SpaceOverviewEntry[]
   timestamp: string
+  /** True when the backend served this from its in-memory cache (RAG API was unreachable). */
+  stale?: boolean
+  /** ISO 8601 timestamp of when the cached data was originally captured. */
+  cachedAt?: string
 }
 
 export interface SpaceParams {
@@ -218,6 +225,8 @@ export interface SyncProgressEvent {
   indexed_count: number
   failed_count: number
   total: number
+  /** Reason for skip/failure (e.g. "already_exists", "no_spaces_assigned") */
+  reason?: string
 }
 
 export interface SyncCompleteEvent {
@@ -238,14 +247,22 @@ export type SyncSSEEvent =
   | { event: 'sync:complete'; data: SyncCompleteEvent }
   | { event: 'sync:error'; data: SyncErrorEvent }
 
+/** @see backend/src/services/sync-progress.ts — `SyncDocProgress` (keep in sync manually) */
 export interface SyncDocProgress {
   doc_id: number
   title: string
   status: 'pending' | 'processing' | 'success' | 'skipped' | 'error'
   spaces: string[]
   chunks_created: number
+  /** Reason for skip/failure (e.g. "already_exists", "no_spaces_assigned") */
+  reason?: string
 }
 
+/**
+ * @see backend/src/services/sync-progress.ts — `SyncJobState`
+ * Backend `docs` is `Map<number, SyncDocProgress>`, frontend is `SyncDocProgress[]`.
+ * Keep in sync manually.
+ */
 export interface SyncJobProgress {
   running: boolean
   startedAt: string | null

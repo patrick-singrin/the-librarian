@@ -6,10 +6,11 @@ import {
 } from '@phosphor-icons/react'
 import { useSettings, useUpdateSettings } from '../../hooks/useSettings'
 import { useHealth } from '../../hooks/useHealth'
+import { useLocalToolsInfo, useRagProcessStatus, useRagProcessAction } from '../../hooks/useLocalTools'
 import { Tile } from '../ui'
 import { Button } from '../ui'
 import { api } from '../../api/client'
-import type { Settings, ConnectionTestResult, RagProcessInfo, LocalToolsInfo, ServiceStatus } from '../../types/api'
+import type { Settings, ConnectionTestResult, ServiceStatus } from '../../types/api'
 import type { ComponentType } from 'react'
 import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
 
@@ -216,53 +217,53 @@ interface ServiceCardProps {
 
 function ServiceCard({ section, serverData }: ServiceCardProps) {
   const updateSettings = useUpdateSettings()
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = {}
-    for (const field of section.fields) {
-      init[field.key] = serverData[field.key]
-    }
-    return init
-  })
+  const [touched, setTouched] = useState(false)
+  const [localValues, setLocalValues] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
-  const touchedRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
-
-  // Sync from server data (e.g. after another card saves + query invalidation)
-  // but skip if the user has been editing this card
-  useEffect(() => {
-    if (touchedRef.current) return
-    const next: Record<string, string> = {}
-    for (const field of section.fields) {
-      next[field.key] = serverData[field.key]
-    }
-    setValues(next)
-  }, [serverData, section.fields])
 
   // Cleanup timer on unmount
   useEffect(() => {
     return () => clearTimeout(timerRef.current)
   }, [])
 
-  function handleChange(key: keyof Settings, value: string) {
-    touchedRef.current = true
-    setSaved(false)
-    setValues((prev) => ({ ...prev, [key]: value }))
+  // Derive display values: show local edits when touched, otherwise server data
+  function getValue(key: keyof Settings): string {
+    return touched ? (localValues[key] ?? serverData[key]) : serverData[key]
   }
 
-  const isDirty = section.fields.some((f) => values[f.key] !== serverData[f.key])
+  function handleChange(key: keyof Settings, value: string) {
+    if (!touched) {
+      // Initialise local values from server data on first edit
+      const init: Record<string, string> = {}
+      for (const field of section.fields) {
+        init[field.key] = serverData[field.key]
+      }
+      init[key] = value
+      setLocalValues(init)
+    } else {
+      setLocalValues((prev) => ({ ...prev, [key]: value }))
+    }
+    setTouched(true)
+    setSaved(false)
+  }
+
+  const isDirty = section.fields.some((f) => getValue(f.key) !== serverData[f.key])
 
   function handleSave() {
     const updates: Partial<Settings> = {}
     for (const field of section.fields) {
-      if (values[field.key] !== serverData[field.key]) {
-        updates[field.key as keyof Settings] = values[field.key]
+      const v = getValue(field.key)
+      if (v !== serverData[field.key]) {
+        updates[field.key as keyof Settings] = v
       }
     }
     if (Object.keys(updates).length === 0) return
 
     updateSettings.mutate(updates, {
       onSuccess: () => {
-        touchedRef.current = false
+        setTouched(false)
+        setLocalValues({})
         setSaved(true)
         clearTimeout(timerRef.current)
         timerRef.current = setTimeout(() => setSaved(false), 2000)
@@ -277,7 +278,7 @@ function ServiceCard({ section, serverData }: ServiceCardProps) {
           <SettingsField
             key={key}
             label={label}
-            value={values[key] ?? ''}
+            value={getValue(key)}
             sensitive={sensitive}
             placeholder={placeholder}
             options={options}
@@ -356,41 +357,109 @@ function DependencyStatus({ label, status }: { label: string; status: ServiceSta
   )
 }
 
-function LocalToolsSection() {
-  const [info, setInfo] = useState<LocalToolsInfo | null>(null)
-  const [ragInfo, setRagInfo] = useState<RagProcessInfo | null>(null)
-  const [busy, setBusy] = useState(false)
-  const { data: health } = useHealth()
+function MetaTagConfig() {
+  const { data: settings } = useSettings()
+  const updateSettings = useUpdateSettings()
+  const [touched, setTouched] = useState(false)
+  const [values, setValues] = useState({ tagName: '', tagId: '' })
+  const [saved, setSaved] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>()
 
-  const refresh = useCallback(async () => {
-    try {
-      const [tools, rag] = await Promise.all([
-        api.localToolsInfo(),
-        api.ragProcessStatus(),
-      ])
-      setInfo(tools)
-      setRagInfo(rag)
-    } catch {
-      // Backend unreachable
-    }
-  }, [])
+  // Derive display values: show local edits when touched, otherwise server data
+  const tagName = touched ? values.tagName : (settings?.metaNewTagName ?? '')
+  const tagId = touched ? values.tagId : (settings?.metaNewTagId ?? '')
 
   useEffect(() => {
-    refresh()
-    const id = setInterval(refresh, 5000)
-    return () => clearInterval(id)
-  }, [refresh])
+    return () => clearTimeout(timerRef.current)
+  }, [])
 
-  async function handleRagAction(action: 'start' | 'stop' | 'restart') {
-    setBusy(true)
-    try {
-      await api.ragProcessAction(action)
-      setTimeout(refresh, 800)
-    } finally {
-      setBusy(false)
-    }
+  if (!settings) return null
+
+  const isDirty =
+    tagName !== settings.metaNewTagName || tagId !== settings.metaNewTagId
+
+  function handleChange(field: 'tagName' | 'tagId', value: string) {
+    setTouched(true)
+    setSaved(false)
+    setValues((prev) => ({ ...prev, [field]: value }))
   }
 
+  function handleSave() {
+    if (!isDirty) return
+    const updates: Partial<Settings> = {}
+    if (tagName !== settings!.metaNewTagName) updates.metaNewTagName = tagName
+    if (tagId !== settings!.metaNewTagId) updates.metaNewTagId = tagId
+
+    updateSettings.mutate(updates, {
+      onSuccess: () => {
+        setTouched(false)
+        setSaved(true)
+        clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setSaved(false), 2000)
+      },
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md bg-base-subtle-background-default p-3">
+      <p className="text-xs text-base-subtle-foreground-default">
+        Documents with this Paperless tag are picked up for enrichment.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-base-foreground-default">Tag Name</span>
+          <input
+            type="text"
+            value={tagName}
+            placeholder="NEW"
+            onChange={(e) => handleChange('tagName', e.target.value)}
+            className={fieldClassName}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-base-foreground-default">Tag ID</span>
+          <input
+            type="text"
+            value={tagId}
+            placeholder="151"
+            onChange={(e) => handleChange('tagId', e.target.value)}
+            className={fieldClassName}
+          />
+        </label>
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        {saved && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-success-foreground-default">
+            <CheckCircle size={14} weight="fill" />
+            Saved
+          </span>
+        )}
+        {updateSettings.error && (
+          <span className="text-xs text-error-foreground-default">
+            {updateSettings.error.message}
+          </span>
+        )}
+        <Button
+          variant="primary-solid"
+          size="sm"
+          iconLeft={FloppyDisk}
+          isDisabled={!isDirty || updateSettings.isPending}
+          onPress={handleSave}
+        >
+          {updateSettings.isPending ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function LocalToolsSection() {
+  const { data: info } = useLocalToolsInfo()
+  const { data: ragInfo } = useRagProcessStatus()
+  const ragAction = useRagProcessAction()
+  const { data: health } = useHealth()
+
+  const busy = ragAction.isPending
   const ragStatus = ragInfo?.status ?? 'stopped'
 
   const qdrantStatus = health?.services.qdrant.status
@@ -446,7 +515,7 @@ function LocalToolsSection() {
                 size="sm"
                 iconLeft={busy ? undefined : Play}
                 isDisabled={busy || !depsReady}
-                onPress={() => handleRagAction('start')}
+                onPress={() => ragAction.mutate('start')}
                 aria-label={!depsReady ? 'Qdrant and LLM Provider must be running first' : undefined}
               >
                 {busy && <CircleNotch size={20} className="shrink-0 animate-spin" />}
@@ -459,7 +528,7 @@ function LocalToolsSection() {
                 size="sm"
                 iconLeft={busy ? undefined : Stop}
                 isDisabled={busy}
-                onPress={() => handleRagAction('stop')}
+                onPress={() => ragAction.mutate('stop')}
               >
                 {busy && <CircleNotch size={20} className="shrink-0 animate-spin" />}
                 Stop
@@ -470,7 +539,7 @@ function LocalToolsSection() {
               size="sm"
               iconLeft={ArrowsClockwise}
               isDisabled={busy || ragStatus === 'stopped'}
-              onPress={() => handleRagAction('restart')}
+              onPress={() => ragAction.mutate('restart')}
             >
               Restart
             </Button>
@@ -483,12 +552,13 @@ function LocalToolsSection() {
         <hr className="border-base-subtle-border-default" />
 
         {/* Meta Enrichment */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <span className="text-sm font-medium text-base-foreground-default">Meta Enrichment</span>
           {info && <ToolPathStatus exists={info.meta.exists} path={info.meta.path} />}
           <p className="text-xs text-base-subtle-foreground-disabled">
             Runs on demand from the Meta page — no background process.
           </p>
+          <MetaTagConfig />
         </div>
       </div>
     </Tile>

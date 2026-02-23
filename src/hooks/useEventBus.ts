@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { eventKeyMap } from '../api/queryKeys'
 
 /**
  * Subscribe to the backend SSE event bus (`GET /api/events`).
@@ -37,7 +38,10 @@ export function useEventBus() {
 
           if (payload.type === 'invalidate' && payload.keys) {
             for (const key of payload.keys) {
-              queryClient.invalidateQueries({ queryKey: [key] })
+              const registryKey = eventKeyMap[key]
+              if (registryKey) {
+                queryClient.invalidateQueries({ queryKey: registryKey })
+              }
             }
           }
           // Notification events can be handled here in the future

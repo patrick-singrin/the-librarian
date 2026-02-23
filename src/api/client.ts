@@ -69,6 +69,9 @@ export const api = {
 
   metaStatus: () => request<import('../types/api.js').MetaJob>('/api/meta/status'),
 
+  metaClear: () =>
+    request<{ ok: boolean }>('/api/meta/clear', { method: 'POST' }),
+
   overview: () => request<import('../types/api.js').OverviewStats>('/api/overview'),
 
   timeline: (range: import('../types/api.js').TimelineRange) =>
@@ -116,4 +119,8 @@ export const api = {
   /** Polling fallback: get current sync job state. */
   ragSyncProgress: () =>
     request<import('../types/api.js').SyncJobProgress>('/api/rag/sync/progress'),
+
+  /** Clear stored sync state after user acknowledges completion. */
+  ragSyncClear: () =>
+    request<{ ok: boolean }>('/api/rag/sync/clear', { method: 'POST' }),
 }

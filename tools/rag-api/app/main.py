@@ -829,7 +829,7 @@ async def sync_stream(
                 logger.error(f"Failed to index document {doc_id}: {e}")
 
             # --- sync:progress ---
-            yield sse("sync:progress", {
+            progress_event = {
                 "doc_id": doc_id,
                 "title": title,
                 "status": status,
@@ -839,7 +839,10 @@ async def sync_stream(
                 "skipped_count": len(skipped_docs),
                 "failed_count": len(failed_docs),
                 "total": total,
-            })
+            }
+            if status == "skipped" and "reason" in result:
+                progress_event["reason"] = result["reason"]
+            yield sse("sync:progress", progress_event)
 
         # --- sync:complete ---
         yield sse("sync:complete", {

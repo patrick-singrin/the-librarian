@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { config } from '../config.js'
 import { listDocumentsWithTag } from '../services/paperless-client.js'
-import { getMetaStatus, runMetaEnrich } from '../services/meta-runner.js'
+import { getMetaStatus, runMetaEnrich, clearMetaJob } from '../services/meta-runner.js'
 
 export const metaRouter = Router()
 
@@ -26,4 +26,9 @@ metaRouter.post('/enrich', (_req, res) => {
 
 metaRouter.get('/status', (_req, res) => {
   res.json(getMetaStatus())
+})
+
+metaRouter.post('/clear', (_req, res) => {
+  clearMetaJob()
+  res.json({ ok: true })
 })

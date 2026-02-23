@@ -6,6 +6,7 @@ import type { ServiceHealth, HealthResponse } from '../../types/api'
 import type { IndicatorVariant } from '../ui'
 import { Badge, Tooltip } from '../ui'
 import { Button as AriaButton } from 'react-aria-components'
+import { RagHealthBanner } from './RagHealthBanner'
 
 interface ServiceConfig {
   key: keyof HealthResponse['services']
@@ -47,32 +48,35 @@ export function StatusBar() {
   const { data } = useHealth()
 
   return (
-    <div
-      role="status"
-      aria-label="Service status"
-      className="sticky top-0 z-10 flex h-[52px] items-center gap-3 border-b border-base-subtle-border-default bg-white px-6"
-    >
-      <h1 className="mr-auto text-lg font-bold text-base-foreground-default">The Librarian</h1>
-      {services.map(({ key, label, icon }) => {
-        const health = data?.services[key]
-        const indicator = statusToIndicator(health)
+    <>
+      <div
+        role="status"
+        aria-label="Service status"
+        className="sticky top-0 z-10 flex h-[52px] items-center gap-3 border-b border-base-subtle-border-default bg-white px-6"
+      >
+        <h1 className="mr-auto text-lg font-bold text-base-foreground-default">The Librarian</h1>
+        {services.map(({ key, label, icon }) => {
+          const health = data?.services[key]
+          const indicator = statusToIndicator(health)
 
-        return (
-          <Tooltip key={key} content={<TooltipContent health={health} />} placement="bottom">
-            <AriaButton className="cursor-default rounded-full outline-focus transition-[background-color,box-shadow] focus-visible:outline-2 focus-visible:outline-offset-2">
-              <Badge
-                variant="base"
-                type="outline"
-                size="xs"
-                indicator={indicator}
-                icon={icon}
-              >
-                {label}
-              </Badge>
-            </AriaButton>
-          </Tooltip>
-        )
-      })}
-    </div>
+          return (
+            <Tooltip key={key} content={<TooltipContent health={health} />} placement="bottom">
+              <AriaButton className="cursor-default rounded-full outline-focus transition-[background-color,box-shadow] focus-visible:outline-2 focus-visible:outline-offset-2">
+                <Badge
+                  variant="base"
+                  type="outline"
+                  size="xs"
+                  indicator={indicator}
+                  icon={icon}
+                >
+                  {label}
+                </Badge>
+              </AriaButton>
+            </Tooltip>
+          )
+        })}
+      </div>
+      <RagHealthBanner />
+    </>
   )
 }

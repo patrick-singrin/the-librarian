@@ -1,14 +1,18 @@
 import { Fragment, type ReactNode } from 'react'
 import {
   ArrowRight,
+  Atom,
+  CircleNotch,
   Database,
   FloppyDisk,
   MagnifyingGlass,
   PencilSimple,
   Plus,
+  Scribble,
   Trash,
   WarningCircle,
   CheckCircle,
+  Check,
   Info,
   Heart,
 } from '@phosphor-icons/react'
@@ -31,6 +35,7 @@ import {
   ProgressBar,
   SpaceTile,
   DocumentTile,
+  PipelineTile,
   Label,
   InputItem,
   TextField,
@@ -667,6 +672,145 @@ function DocumentTileSection() {
 }
 
 /* ────────────────────────────────────────────────────── *
+ *  PipelineTile
+ * ────────────────────────────────────────────────────── */
+
+/** Dummy docs for PipelineTile demos. */
+const demoDocs = Array.from({ length: 12 }, (_, i) => ({
+  id: 4000 + i,
+  title: `Document-${String(i + 1).padStart(3, '0')}.pdf`,
+}))
+
+const noop = () => undefined
+
+function PipelineTileSection() {
+  return (
+    <Section
+      title="PipelineTile"
+      description="Shared layout for document-processing pipelines (RAG Ingest, Meta Data). Wraps a Tile with a progress row, action button, optional banner slot, and a collapsible document list with loading/empty states."
+    >
+      <div>
+        <ExampleRow label="queued (collapsed)">
+          <PipelineTile
+            title="RAG Ingest Tool"
+            icon={Database}
+            badge={{ label: '12 new', variant: 'primary' }}
+            progressValue={38}
+            progressTotal={50}
+            actionLabel="Start Sync"
+            actionIcon={Scribble}
+            onAction={noop}
+            docs={demoDocs}
+            renderDoc={(doc) => (
+              <DocumentTile title={doc.title} documentId={doc.id} spaceName="finance" />
+            )}
+          />
+        </ExampleRow>
+
+        <ExampleRow label="queued (few docs)">
+          <PipelineTile
+            title="Meta Data Tool"
+            icon={Atom}
+            progressValue={0}
+            progressTotal={3}
+            actionLabel="Enrich"
+            actionIcon={Atom}
+            onAction={noop}
+            docs={demoDocs.slice(0, 3)}
+            renderDoc={(doc) => (
+              <DocumentTile title={doc.title} documentId={doc.id} />
+            )}
+          />
+        </ExampleRow>
+
+        <ExampleRow label="active (streaming)">
+          <PipelineTile
+            title="RAG Ingest Tool"
+            icon={Database}
+            badge={{ label: 'Syncing', variant: 'info' }}
+            progressValue={5}
+            progressTotal={12}
+            progressLabel="Indexed"
+            actionLabel="Syncing…"
+            actionIcon={CircleNotch}
+            onAction={noop}
+            actionDisabled
+            active
+            docs={demoDocs.slice(0, 6)}
+            renderDoc={(doc) => (
+              <DocumentTile
+                title={doc.title}
+                documentId={doc.id}
+                spaceName="finance"
+                syncStatus={doc.id < 4003 ? 'success' : doc.id === 4003 ? 'processing' : 'pending'}
+              />
+            )}
+          />
+        </ExampleRow>
+
+        <ExampleRow label="loading">
+          <PipelineTile
+            title="Meta Data Tool"
+            icon={Atom}
+            progressValue={0}
+            progressTotal={0}
+            actionLabel="Enrich"
+            actionIcon={Atom}
+            onAction={noop}
+            actionDisabled
+            loading
+            docs={[]}
+            renderDoc={() => null}
+          />
+        </ExampleRow>
+
+        <ExampleRow label="empty + refresh">
+          <PipelineTile
+            title="RAG Ingest Tool"
+            icon={Database}
+            badge={{ label: 'Idle', variant: 'base' }}
+            progressValue={50}
+            progressTotal={50}
+            actionLabel="Start Sync"
+            actionIcon={Scribble}
+            onAction={noop}
+            actionDisabled
+            docs={[]}
+            renderDoc={() => null}
+            onRefresh={noop}
+          />
+        </ExampleRow>
+
+        <ExampleRow label="with banner slot">
+          <PipelineTile
+            title="RAG Ingest Tool"
+            icon={Database}
+            badge={{ label: 'Done', variant: 'success' }}
+            progressValue={12}
+            progressTotal={12}
+            actionLabel="Acknowledge"
+            actionIcon={Check}
+            actionVariant="base-outline"
+            onAction={noop}
+            active
+            docs={demoDocs.slice(0, 4)}
+            renderDoc={(doc) => (
+              <DocumentTile title={doc.title} documentId={doc.id} spaceName="finance" syncStatus="success" />
+            )}
+            banner={
+              <div role="status" className="flex items-center gap-2 rounded-lg border border-success-subtle-border-default bg-success-subtle-background-default px-3 py-2 text-sm text-success-foreground-default">
+                <CheckCircle size={16} weight="fill" className="shrink-0" />
+                <span>Sync complete — 12 documents indexed, 0 skipped</span>
+              </div>
+            }
+          />
+        </ExampleRow>
+      </div>
+    </Section>
+  )
+}
+
+/* ────────────────────────────────────────────────────── *
  *  Color Roles Overview
  * ────────────────────────────────────────────────────── */
 
@@ -860,6 +1004,7 @@ export function ComponentsDemo() {
       <ProgressBarSection />
       <SpaceTileSection />
       <DocumentTileSection />
+      <PipelineTileSection />
       <ColorRolesSection />
       <TokenSection />
     </div>

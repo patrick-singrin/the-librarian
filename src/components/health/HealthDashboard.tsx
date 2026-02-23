@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { Files, TrayArrowDown, ArrowsClockwise, FileArchive, Circuitry } from '@phosphor-icons/react'
 import { useOverview } from '../../hooks/useOverview'
 import { useCheckNew } from '../../hooks/useSyncStatus'
@@ -7,34 +6,22 @@ import { useTick } from '../../hooks/useTick'
 import { KpiTile } from '../ui'
 import { DocumentTimeline } from './DocumentTimeline'
 
-interface PaperlessSnapshot {
-  documents: number
-  inbox: number
-  updatedAt: number
-}
-
 export function HealthDashboard() {
   const overview = useOverview()
   const checkNew = useCheckNew()          // shared cache with RAG Tool page
   const rag = useServiceHealth('rag')
-  const lastGoodPaperless = useRef<PaperlessSnapshot | null>(null)
 
   // Keep relative timestamps fresh
   useTick(60_000)
 
   // ── Paperless KPIs (from overview) ──
+  // React Query keeps old data on refetch errors + localStorage persistence,
+  // so we can derive the snapshot directly — no need to stash "last good" state.
   const p = overview.data?.paperless
   const hasPaperless = p != null && p.totalDocuments > 0
-
-  if (hasPaperless) {
-    lastGoodPaperless.current = {
-      documents: p.totalDocuments,
-      inbox: p.inboxDocuments,
-      updatedAt: overview.dataUpdatedAt,
-    }
-  }
-
-  const pSnap = lastGoodPaperless.current
+  const pSnap = hasPaperless
+    ? { documents: p.totalDocuments, inbox: p.inboxDocuments, updatedAt: overview.dataUpdatedAt }
+    : null
   const pLoading = !pSnap && overview.isFetching
 
   // ── RAG "Synced" KPI (from useCheckNew — same cache as RAG Tool) ──
@@ -49,16 +36,11 @@ export function HealthDashboard() {
 
   return (
     <div>
-      {hasError && (
-        rag.isStarting ? (
-          <div role="status" className="mb-4 rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
-            {rag.message}
-          </div>
-        ) : (
-          <div role="alert" className="mb-4 rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
-            Unable to load overview: {(overview.error ?? checkNew.error)?.message}
-          </div>
-        )
+      {/* Error — only for genuine unexpected failures (global banner handles RAG down/starting) */}
+      {hasError && !rag.isDown && !rag.isStarting && (
+        <div role="alert" className="mb-4 rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
+          Unable to load overview: {(overview.error ?? checkNew.error)?.message}
+        </div>
       )}
 
       <section aria-label="Key statistics">

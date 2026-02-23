@@ -3,26 +3,23 @@ import {
   Check,
   Database,
   Info,
-  MagnifyingGlass,
   Plus,
   Scribble,
   CircleNotch,
 } from '@phosphor-icons/react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useSpacesOverview, useCheckNew } from '../../hooks/useSyncStatus'
 import { useSyncStream, type SyncPhase } from '../../hooks/useSyncStream'
+import { useSyncAcknowledge } from '../../hooks/useSyncAcknowledge'
 import { useServiceHealth } from '../../hooks/useServiceHealth'
-import { Button, Dialog, DocumentTile, Indicator, ProgressBar, SpaceTile, Tile } from '../ui'
+import { Button, Dialog, DocumentTile, Indicator, PipelineTile, SpaceTile } from '../ui'
 import type { TileBadge } from '../ui'
 import type { DocSyncStatus } from '../ui/DocumentTile'
 import { SpacesTile } from './SpacesTile'
 
 export function SyncPage() {
-  const queryClient = useQueryClient()
   const [showModelInfo, setShowModelInfo] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isManualCheck, setIsManualCheck] = useState(false)
-  const [pipelineExpanded, setPipelineExpanded] = useState(false)
 
   // Sync stream state
   const stream = useSyncStream()
@@ -106,6 +103,7 @@ export function SyncPage() {
         title: d.title,
         spaces: d.spaces,
         syncStatus: d.status as DocSyncStatus,
+        reason: d.reason,
       }))
     }
     return newDocs.map((d) => ({
@@ -113,20 +111,11 @@ export function SyncPage() {
       title: d.title,
       spaces: d.spaces,
       syncStatus: undefined as DocSyncStatus | undefined,
+      reason: undefined as string | undefined,
     }))
   }, [stream.phase, stream.docs, newDocs])
 
-  // Determine pipeline visual state
-  const pipelineState = (() => {
-    if (loading) return 'loading' as const
-    if (stream.phase === 'streaming' || stream.phase === 'completed') return 'streaming' as const
-    if (pipelineDocs.length > 0) return 'queued' as const
-    if (isFullySynced) return 'synced' as const
-    return 'empty' as const
-  })()
-
   function handleSync() {
-    setPipelineExpanded(false)
     stream.startSync()
   }
 
@@ -138,40 +127,12 @@ export function SyncPage() {
   // Derive the "checking" visual state — only true for user-initiated checks
   const isCheckingNew = isManualCheck && checkNew.isFetching
 
-  // Manual reset — optimistically patch the cache so the UI updates instantly
-  function handleAcknowledge() {
-    // Patch spaces-overview: apply stream deltas to cached baseline
-    queryClient.setQueryData<import('../../types/api').SpacesOverview>(
-      ['rag-spaces-overview'],
-      (old) => {
-        if (!old) return old
-        return {
-          ...old,
-          spaces: old.spaces.map((entry) => {
-            const delta = stream.indexedBySpace.get(entry.slug) ?? 0
-            const indexed = entry.indexed + delta
-            return { ...entry, indexed, newCount: Math.max(0, entry.newCount - delta) }
-          }),
-        }
-      },
-    )
-
-    // Patch check-new: clear the pipeline queue
-    queryClient.setQueryData<import('../../types/api').CheckNewResponse>(
-      ['rag-check-new', undefined],
-      (old) => {
-        if (!old) return old
-        return {
-          ...old,
-          new_count: 0,
-          new_documents: [],
-          total_indexed: old.total_indexed + stream.indexedCount,
-        }
-      },
-    )
-
-    stream.reset()
-  }
+  // Optimistically patch the cache when the user acknowledges a completed sync
+  const handleAcknowledge = useSyncAcknowledge({
+    indexedBySpace: stream.indexedBySpace,
+    indexedCount: stream.indexedCount,
+    reset: stream.reset,
+  })
 
   return (
     <div className="flex flex-col gap-6">
@@ -283,127 +244,41 @@ export function SyncPage() {
         </div>
       )}
 
-      {/* Error states (from checkNew — only shown when idle) */}
-      {stream.phase === 'idle' && checkNew.error && (
-        rag.isStarting ? (
-          <div role="status" className="rounded-lg border border-warning-subtle-border-default bg-warning-subtle-background-default p-4 text-sm text-warning-foreground-default">
-            {rag.message}
-          </div>
-        ) : (
-          <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
-            Unable to load stats: {checkNew.error.message}
-          </div>
-        )
+      {/* Error — only for genuine unexpected failures (RAG claims healthy but call failed) */}
+      {stream.phase === 'idle' && checkNew.error && !rag.isDown && !rag.isStarting && (
+        <div role="alert" className="rounded-lg border border-error-subtle-border-default bg-error-subtle-background-default p-4 text-sm text-error-foreground-default">
+          Unable to load stats: {checkNew.error.message}
+        </div>
       )}
 
       {/* ── Section 3: RAG Ingest Tool ── */}
-      <Tile title="RAG Ingest Tool" icon={Database} badge={toolBadge}>
-        <div className="flex flex-col gap-4">
-          {/* Progress + Action row */}
-          <div className="flex items-center gap-8">
-            <ProgressBar
-              label="Processed"
-              value={progressValue}
-              total={progressTotal}
-              className="flex-1"
-            />
-            <Button
-              variant={isCompleted ? 'base-outline' : 'primary-solid'}
-              size="sm"
-              iconLeft={stream.isStreaming ? CircleNotch : isCompleted ? Check : Scribble}
-              onPress={isCompleted ? handleAcknowledge : handleSync}
-              isDisabled={buttonDisabled}
-            >
-              {buttonLabel}
-            </Button>
-          </div>
-
-          {/* Sync feedback banners */}
-          <SyncBanner phase={stream.phase} stream={stream} />
-
-          {/* Pipeline container */}
-          <div className="rounded-md bg-base-subtle-background-default p-4">
-            {/* Loading state */}
-            {pipelineState === 'loading' && (
-              <div className="flex items-center justify-center py-6">
-                <p className="text-sm text-base-subtle-foreground-default">Loading…</p>
-              </div>
-            )}
-
-            {/* Queued / streaming documents */}
-            {(pipelineState === 'queued' || pipelineState === 'streaming') && pipelineDocs.length > 0 && (() => {
-              const PREVIEW_LIMIT = 10
-              const isQueued = pipelineState === 'queued'
-              const showAll = !isQueued || pipelineExpanded
-              const visibleDocs = showAll ? pipelineDocs : pipelineDocs.slice(0, PREVIEW_LIMIT)
-              const hiddenCount = pipelineDocs.length - PREVIEW_LIMIT
-
-              return (
-                <div className="flex flex-col gap-2.5">
-                  <ul className={`flex flex-col gap-2.5 ${showAll ? 'max-h-[480px] overflow-y-auto' : ''}`}>
-                    {visibleDocs.map((doc) => (
-                      <li key={doc.id}>
-                        <DocumentTile
-                          title={doc.title}
-                          documentId={doc.id}
-                          spaceName={doc.spaces[0] ? (spacesList.find((s) => s.slug === doc.spaces[0])?.name ?? doc.spaces[0]) : undefined}
-                          syncStatus={doc.syncStatus}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                  {isQueued && hiddenCount > 0 && (
-                    <Button
-                      variant="primary-ghost"
-                      size="sm"
-                      onPress={() => setPipelineExpanded((v) => !v)}
-                      className="self-center"
-                    >
-                      {pipelineExpanded ? 'Show less' : `Show all ${pipelineDocs.length} documents`}
-                    </Button>
-                  )}
-                </div>
-              )
-            })()}
-
-            {/* Empty queue */}
-            {pipelineState === 'empty' && (
-              <div className="flex flex-col items-center gap-3 py-6">
-                <p className="text-sm text-base-subtle-foreground-default">
-                  There are no documents in the queue.
-                </p>
-                <Button
-                  variant="base-outline"
-                  size="sm"
-                  iconLeft={MagnifyingGlass}
-                  onPress={handleManualCheck}
-                  isDisabled={isCheckingNew}
-                >
-                  {isCheckingNew ? 'Checking…' : 'Check for new documents'}
-                </Button>
-              </div>
-            )}
-
-            {/* Fully synced */}
-            {pipelineState === 'synced' && (
-              <div className="flex flex-col items-center gap-3 rounded-md bg-success-subtle-background-default py-6">
-                <p className="text-sm font-medium text-success-foreground-default">
-                  All documents have been processed
-                </p>
-                <Button
-                  variant="base-outline"
-                  size="sm"
-                  iconLeft={MagnifyingGlass}
-                  onPress={handleManualCheck}
-                  isDisabled={isCheckingNew}
-                >
-                  {isCheckingNew ? 'Checking…' : 'Check for new documents'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </Tile>
+      <PipelineTile
+        title="RAG Ingest Tool"
+        icon={Database}
+        badge={toolBadge}
+        progressValue={progressValue}
+        progressTotal={progressTotal}
+        actionLabel={buttonLabel}
+        actionIcon={stream.isStreaming ? CircleNotch : isCompleted ? Check : Scribble}
+        actionVariant={isCompleted ? 'base-outline' : 'primary-solid'}
+        onAction={isCompleted ? handleAcknowledge : handleSync}
+        actionDisabled={buttonDisabled}
+        loading={loading}
+        active={stream.phase !== 'idle'}
+        docs={pipelineDocs}
+        renderDoc={(doc) => (
+          <DocumentTile
+            title={doc.title}
+            documentId={doc.id}
+            spaceName={doc.spaces[0] ? (spacesList.find((s) => s.slug === doc.spaces[0])?.name ?? doc.spaces[0]) : undefined}
+            syncStatus={doc.syncStatus}
+            reason={doc.reason}
+          />
+        )}
+        banner={<SyncBanner phase={stream.phase} stream={stream} />}
+        onRefresh={handleManualCheck}
+        refreshing={isCheckingNew}
+      />
     </div>
   )
 }

@@ -31,6 +31,9 @@ export type { SpaceTileProps } from './SpaceTile'
 export { DocumentTile } from './DocumentTile'
 export type { DocumentTileProps } from './DocumentTile'
 
+export { PipelineTile } from './PipelineTile'
+export type { PipelineTileProps, PipelineItem } from './PipelineTile'
+
 export { NavItem } from './NavItem'
 export type { NavItemProps } from './NavItem'
 

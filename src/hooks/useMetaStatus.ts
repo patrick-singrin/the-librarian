@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { queryKeys } from '../api/queryKeys'
 
 export function useMetaPending() {
   return useQuery({
-    queryKey: ['meta-pending'],
+    queryKey: queryKeys.meta.pending,
     queryFn: api.metaPending,
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
@@ -15,14 +16,14 @@ export function useMetaEnrich() {
   return useMutation({
     mutationFn: api.metaEnrich,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['meta-pending'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.meta.pending })
     },
   })
 }
 
 export function useMetaJobStatus(enabled: boolean) {
   return useQuery({
-    queryKey: ['meta-status'],
+    queryKey: queryKeys.meta.status,
     queryFn: api.metaStatus,
     refetchInterval: enabled ? 3_000 : false,
     enabled,

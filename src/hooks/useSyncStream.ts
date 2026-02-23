@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { invalidateSyncQueries } from '../api/invalidation'
 import type {
   SyncStartEvent,
   SyncProgressEvent,
@@ -120,6 +121,7 @@ export function useSyncStream() {
                           ...d,
                           status: data.status as SyncDocProgress['status'],
                           chunks_created: data.chunks_created,
+                          reason: data.reason,
                         }
                       : d,
                   )
@@ -222,10 +224,7 @@ export function useSyncStream() {
         if (!progress.running) {
           clearInterval(pollingRef.current!)
           pollingRef.current = null
-          // Invalidate queries to get fresh data
-          queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
-          queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
-          queryClient.invalidateQueries({ queryKey: ['rag-spaces-overview'] })
+          invalidateSyncQueries(queryClient)
         }
       } catch {
         // Network error — stop polling
@@ -262,9 +261,7 @@ export function useSyncStream() {
         await consumeStream(response)
 
         // After stream ends, invalidate queries to refresh server truth
-        queryClient.invalidateQueries({ queryKey: ['rag-check-new'] })
-        queryClient.invalidateQueries({ queryKey: ['rag-indexed-documents'] })
-        queryClient.invalidateQueries({ queryKey: ['rag-spaces-overview'] })
+        invalidateSyncQueries(queryClient)
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {
           setState((s) => ({
