@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import {
   Brain, Plus, Plugs, Trash, PencilSimple, Power,
   CircleNotch, CheckCircle, XCircle, Eye, EyeSlash,
+  CaretDown, MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { Tile, Button, Badge, Dialog, IconButton } from '../ui'
 import { api } from '../../api/client'
@@ -12,7 +13,7 @@ import {
   useDeleteLlmSource,
   useActivateLlmSource,
 } from '../../hooks/useLlmSources'
-import type { LlmSource, LlmSourceCreateRequest, ConnectionTestResult } from '../../types/api'
+import type { LlmSource, LlmSourceCreateRequest, LlmModel, ConnectionTestResult } from '../../types/api'
 
 // ---------------------------------------------------------------------------
 // Shared styles
@@ -162,6 +163,13 @@ function SourceFormDialog({
   const [keyVisible, setKeyVisible] = useState(false)
   const keyRef = useRef<HTMLInputElement>(null)
 
+  // Model picker state
+  const [models, setModels] = useState<LlmModel[]>([])
+  const [modelsFetching, setModelsFetching] = useState(false)
+  const [modelsError, setModelsError] = useState<string | null>(null)
+  const [modelsOpen, setModelsOpen] = useState(false)
+  const modelDropdownRef = useRef<HTMLDivElement>(null)
+
   const isEditing = !!source
 
   // Reset form whenever dialog opens
@@ -181,6 +189,9 @@ function SourceFormDialog({
       setModel('')
     }
     setKeyVisible(false)
+    setModels([])
+    setModelsError(null)
+    setModelsOpen(false)
   }
   prevOpen.current = isOpen
 
@@ -218,6 +229,28 @@ function SourceFormDialog({
       return next
     })
   }, [])
+
+  const fetchAvailableModels = useCallback(async () => {
+    if (!baseUrl.trim()) return
+    setModelsFetching(true)
+    setModelsError(null)
+    try {
+      const list = isEditing && source
+        ? await api.fetchLlmModels(source.id)
+        : await api.discoverLlmModels(baseUrl.trim(), apiKey)
+      setModels(list)
+      if (list.length > 0) {
+        setModelsOpen(true)
+      } else {
+        setModelsError('No models returned')
+      }
+    } catch (e) {
+      setModelsError((e as Error).message)
+      setModels([])
+    } finally {
+      setModelsFetching(false)
+    }
+  }, [baseUrl, apiKey, isEditing, source])
 
   return (
     <Dialog
@@ -273,16 +306,66 @@ function SourceFormDialog({
           </div>
         </label>
 
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-base-foreground-default">Model</span>
-          <input
-            type="text"
-            value={model}
-            placeholder="e.g. gpt-4o-mini"
-            onChange={(e) => setModel(e.target.value)}
-            className={fieldClassName}
-          />
-        </label>
+          <div className="relative" ref={modelDropdownRef}>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={model}
+                  placeholder="e.g. gpt-4o-mini"
+                  onChange={(e) => { setModel(e.target.value); setModelsOpen(false) }}
+                  className={fieldClassName}
+                />
+                {models.length > 0 && (
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex items-center pr-2 text-base-subtle-foreground-default hover:text-base-foreground-default"
+                    onClick={() => setModelsOpen((v) => !v)}
+                    tabIndex={-1}
+                  >
+                    <CaretDown size={14} />
+                  </button>
+                )}
+              </div>
+              <Button
+                variant="base-outline"
+                size="sm"
+                iconLeft={modelsFetching ? undefined : MagnifyingGlass}
+                isDisabled={modelsFetching || !baseUrl.trim()}
+                onPress={fetchAvailableModels}
+              >
+                {modelsFetching && <CircleNotch size={16} className="shrink-0 animate-spin" />}
+                {modelsFetching ? 'Loading…' : 'Fetch'}
+              </Button>
+            </div>
+
+            {modelsOpen && models.length > 0 && (
+              <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-base-subtle-border-default bg-white shadow-lg">
+                {models.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`w-full px-3 py-1.5 text-left text-sm hover:bg-base-subtle-background-default ${
+                      m.id === model ? 'bg-base-subtle-background-default font-medium text-base-foreground-default' : 'text-base-subtle-foreground-default'
+                    }`}
+                    onClick={() => { setModel(m.id); setModelsOpen(false) }}
+                  >
+                    {m.id}
+                    {m.owned_by && (
+                      <span className="ml-2 text-xs text-base-subtle-foreground-disabled">{m.owned_by}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {modelsError && (
+              <p className="mt-1 text-xs text-error-foreground-default">{modelsError}</p>
+            )}
+          </div>
+        </div>
 
         {(create.error || update.error) && (
           <p className="text-xs text-error-foreground-default">

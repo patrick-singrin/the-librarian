@@ -191,6 +191,34 @@ export async function testSource(
 }
 
 // ---------------------------------------------------------------------------
+// Fetch available models
+// ---------------------------------------------------------------------------
+
+export async function fetchModels(
+  baseUrl: string,
+  apiKey: string,
+): Promise<{ id: string; owned_by?: string }[]> {
+  const headers: Record<string, string> = {}
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+
+  const res = await fetch(`${baseUrl}/v1/models`, {
+    signal: AbortSignal.timeout(8000),
+    headers,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const body = (await res.json()) as { data?: { id: string; owned_by?: string }[] }
+  return (body.data ?? []).sort((a, b) => a.id.localeCompare(b.id))
+}
+
+export async function fetchModelsForSource(
+  id: string,
+): Promise<{ id: string; owned_by?: string }[]> {
+  const source = getSourceById(id)
+  if (!source) throw new Error('Source not found')
+  return fetchModels(source.baseUrl, source.apiKey)
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

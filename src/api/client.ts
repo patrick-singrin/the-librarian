@@ -119,6 +119,15 @@ export const api = {
       method: 'POST',
     }),
 
+  fetchLlmModels: (id: string) =>
+    request<import('../types/api.js').LlmModel[]>(`/api/llm-sources/${id}/models`),
+
+  discoverLlmModels: (baseUrl: string, apiKey: string) =>
+    request<import('../types/api.js').LlmModel[]>('/api/llm-sources/discover-models', {
+      method: 'POST',
+      body: JSON.stringify({ baseUrl, apiKey }),
+    }),
+
   ragProcessStatus: () =>
     request<import('../types/api.js').RagProcessInfo>('/api/settings/rag-process'),
 

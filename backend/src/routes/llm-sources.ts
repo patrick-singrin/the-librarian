@@ -7,6 +7,8 @@ import {
   activateSource,
   testSource,
   maskSource,
+  fetchModels,
+  fetchModelsForSource,
 } from '../services/llm-sources.js'
 
 export const llmSourcesRouter = Router()
@@ -26,6 +28,21 @@ llmSourcesRouter.post('/', (req, res) => {
   try {
     const source = createSource({ name, baseUrl, apiKey: apiKey || '', model })
     res.status(201).json(maskSource(source))
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message })
+  }
+})
+
+/** POST /discover-models — list models for arbitrary baseUrl + apiKey (used during "add source") */
+llmSourcesRouter.post('/discover-models', async (req, res) => {
+  const { baseUrl, apiKey } = req.body
+  if (!baseUrl) {
+    res.status(400).json({ error: 'baseUrl is required' })
+    return
+  }
+  try {
+    const models = await fetchModels(baseUrl, apiKey || '')
+    res.json(models)
   } catch (e) {
     res.status(400).json({ error: (e as Error).message })
   }
@@ -75,5 +92,15 @@ llmSourcesRouter.post('/:id/test', async (req, res) => {
     res.json(result)
   } catch (e) {
     res.status(404).json({ error: (e as Error).message })
+  }
+})
+
+/** GET /:id/models — list models available on an existing source */
+llmSourcesRouter.get('/:id/models', async (req, res) => {
+  try {
+    const models = await fetchModelsForSource(req.params.id)
+    res.json(models)
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message })
   }
 })

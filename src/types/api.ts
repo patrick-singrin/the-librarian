@@ -153,6 +153,11 @@ export interface LlmSource {
 export type LlmSourceCreateRequest = Pick<LlmSource, 'name' | 'baseUrl' | 'apiKey' | 'model'>
 export type LlmSourceUpdateRequest = Partial<LlmSourceCreateRequest>
 
+export interface LlmModel {
+  id: string
+  owned_by?: string
+}
+
 export interface ConnectionTestResult {
   status: 'healthy' | 'down' | 'degraded'
   latencyMs: number
