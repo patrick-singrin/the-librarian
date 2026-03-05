@@ -6,7 +6,9 @@ import { ragRouter } from './routes/rag.js'
 import { metaRouter } from './routes/meta.js'
 import { overviewRouter } from './routes/overview.js'
 import { settingsRouter } from './routes/settings.js'
+import { llmSourcesRouter } from './routes/llm-sources.js'
 import { startRagApi, stopRagApi } from './services/rag-process.js'
+import { getActiveSource } from './services/llm-sources.js'
 import { attachSSE } from './services/event-bus.js'
 
 const app = express()
@@ -22,6 +24,14 @@ app.use('/api/rag', ragRouter)
 app.use('/api/meta', metaRouter)
 app.use('/api/overview', overviewRouter)
 app.use('/api/settings', settingsRouter)
+app.use('/api/llm-sources', llmSourcesRouter)
+
+// Hydrate config from the active LLM source (migrates from .env on first run)
+const activeLlm = getActiveSource()
+if (activeLlm) {
+  config.llmApiUrl = activeLlm.baseUrl
+  config.llmApiKey = activeLlm.apiKey
+}
 
 // Start the RAG API as a managed child process
 startRagApi()

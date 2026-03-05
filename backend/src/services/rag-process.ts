@@ -2,6 +2,7 @@ import { spawn, execSync, type ChildProcess } from 'child_process'
 import { mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { config, toolPaths } from '../config.js'
+import { getActiveSource } from './llm-sources.js'
 
 let ragProcess: ChildProcess | null = null
 let ragReady = false
@@ -53,7 +54,7 @@ export function startRagApi(): void {
     // LLM provider — URL and API key from settings
     OPENROUTER_BASE_URL: `${config.llmApiUrl}/v1`,
     OPENROUTER_API_KEY: config.llmApiKey || 'dummy',
-    OPENROUTER_MODEL: 'ministral-3-14b',
+    OPENROUTER_MODEL: getActiveSource()?.model || 'ministral-3-14b',
     QDRANT_URL: config.qdrantUrl,
     COLLECTION_NAME: 'paperless_chunks',
     EMBEDDING_MODEL: 'sentence-transformers/all-MiniLM-L6-v2',

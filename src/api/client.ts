@@ -90,6 +90,35 @@ export const api = {
       method: 'POST',
     }),
 
+  // LLM Sources
+  llmSources: () =>
+    request<import('../types/api.js').LlmSource[]>('/api/llm-sources'),
+
+  createLlmSource: (body: import('../types/api.js').LlmSourceCreateRequest) =>
+    request<import('../types/api.js').LlmSource>('/api/llm-sources', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateLlmSource: (id: string, body: import('../types/api.js').LlmSourceUpdateRequest) =>
+    request<import('../types/api.js').LlmSource>(`/api/llm-sources/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteLlmSource: (id: string) =>
+    request<{ ok: boolean }>(`/api/llm-sources/${id}`, { method: 'DELETE' }),
+
+  activateLlmSource: (id: string) =>
+    request<import('../types/api.js').LlmSource>(`/api/llm-sources/${id}/activate`, {
+      method: 'POST',
+    }),
+
+  testLlmSource: (id: string) =>
+    request<import('../types/api.js').ConnectionTestResult>(`/api/llm-sources/${id}/test`, {
+      method: 'POST',
+    }),
+
   ragProcessStatus: () =>
     request<import('../types/api.js').RagProcessInfo>('/api/settings/rag-process'),
 

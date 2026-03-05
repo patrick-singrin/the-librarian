@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  FileArchive, Database, Brain, FloppyDisk, Eye, EyeSlash,
+  FileArchive, Database, FloppyDisk, Eye, EyeSlash,
   Plugs, CircleNotch, CheckCircle, XCircle, Play, Stop, ArrowsClockwise,
   Wrench, WarningCircle,
 } from '@phosphor-icons/react'
@@ -10,6 +10,7 @@ import { useLocalToolsInfo, useRagProcessStatus, useRagProcessAction } from '../
 import { Tile } from '../ui'
 import { Button } from '../ui'
 import { api } from '../../api/client'
+import { LlmSourcesSection } from './LlmSourcesSection'
 import type { Settings, ConnectionTestResult, ServiceStatus } from '../../types/api'
 import type { ComponentType } from 'react'
 import type { IconProps as PhosphorIconProps } from '@phosphor-icons/react'
@@ -42,10 +43,6 @@ interface ServiceSection {
 // Config data
 // ---------------------------------------------------------------------------
 
-const llmProviders: SelectOption[] = [
-  { value: 'lmstudio', label: 'LM Studio' },
-]
-
 const serviceSections: ServiceSection[] = [
   {
     title: 'Paperless-NGX',
@@ -54,16 +51,6 @@ const serviceSections: ServiceSection[] = [
     fields: [
       { key: 'paperlessUrl', label: 'API URL', placeholder: 'http://your-nas:8777' },
       { key: 'paperlessToken', label: 'API Token', sensitive: true, placeholder: 'Your Paperless API token' },
-    ],
-  },
-  {
-    title: 'LLM Provider',
-    icon: Brain,
-    testService: 'llm',
-    fields: [
-      { key: 'llmProvider', label: 'Provider', options: llmProviders },
-      { key: 'llmApiUrl', label: 'API URL', placeholder: 'http://localhost:1234' },
-      { key: 'llmApiKey', label: 'API Key', sensitive: true, placeholder: 'API key (optional for LM Studio)' },
     ],
   },
   {
@@ -595,6 +582,7 @@ export function SettingsPage() {
       {serviceSections.map((section) => (
         <ServiceCard key={section.title} section={section} serverData={data} />
       ))}
+      <LlmSourcesSection />
       <LocalToolsSection />
     </div>
   )

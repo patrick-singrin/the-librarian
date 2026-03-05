@@ -136,6 +136,23 @@ export interface Settings {
   metaNewTagName: string
 }
 
+// ---------------------------------------------------------------------------
+// LLM Sources
+// ---------------------------------------------------------------------------
+
+export interface LlmSource {
+  id: string
+  name: string
+  baseUrl: string
+  /** Masked on read; full value on create/update */
+  apiKey: string
+  model: string
+  isActive: boolean
+}
+
+export type LlmSourceCreateRequest = Pick<LlmSource, 'name' | 'baseUrl' | 'apiKey' | 'model'>
+export type LlmSourceUpdateRequest = Partial<LlmSourceCreateRequest>
+
 export interface ConnectionTestResult {
   status: 'healthy' | 'down' | 'degraded'
   latencyMs: number

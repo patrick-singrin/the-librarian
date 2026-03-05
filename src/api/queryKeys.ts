@@ -25,6 +25,10 @@ export const queryKeys = {
     ragProcess: ['settings-rag-process'] as const,
   },
 
+  llmSources: {
+    all: ['llm-sources'] as const,
+  },
+
   meta: {
     pending: ['meta-pending'] as const,
     status: ['meta-status'] as const,
@@ -68,4 +72,5 @@ export const eventKeyMap: Record<string, readonly string[]> = {
   'health': queryKeys.health.all,
   'overview': queryKeys.overview.all,
   'settings': queryKeys.settings.all,
+  'llm-sources': queryKeys.llmSources.all,
 }
