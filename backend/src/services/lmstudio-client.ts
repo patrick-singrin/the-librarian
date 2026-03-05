@@ -3,7 +3,9 @@ import { config } from '../config.js'
 export async function checkLmStudioHealth(): Promise<{ status: string; latencyMs: number; error?: string }> {
   const start = Date.now()
   try {
-    const res = await fetch(`${config.llmApiUrl}/v1/models`, { signal: AbortSignal.timeout(5000) })
+    const headers: Record<string, string> = {}
+    if (config.llmApiKey) headers['Authorization'] = `Bearer ${config.llmApiKey}`
+    const res = await fetch(`${config.llmApiUrl}/v1/models`, { signal: AbortSignal.timeout(5000), headers })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return { status: 'healthy', latencyMs: Date.now() - start }
   } catch (e) {
