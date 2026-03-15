@@ -35,7 +35,7 @@ A self-hosted AI companion for [Paperless-NGX](https://docs.paperless-ngx.com/) 
 └──────────────────┬──────────────────────────┘
                    │ /api proxy
 ┌──────────────────▼──────────────────────────┐
-│  Backend (Node.js Express, port 3001)       │
+│  Backend (Node.js Express, port 3100)       │
 │  API gateway — no business logic            │
 └───┬──────────┬──────────┬───────────────────┘
     │          │          │
@@ -126,7 +126,7 @@ Assign documents to spaces via a Paperless custom field named **RAG Spaces** (ty
 # Terminal 1 — Frontend (port 5173)
 npm run dev
 
-# Terminal 2 — Backend (port 3001)
+# Terminal 2 — Backend (port 3100)
 cd backend && npm run dev
 
 # Terminal 3 — RAG API (port 8088)

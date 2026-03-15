@@ -26,7 +26,7 @@ export interface Config {
 }
 
 export const config: Config = {
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || '3100', 10),
   paperlessUrl: process.env.PAPERLESS_URL || '',
   paperlessToken: process.env.PAPERLESS_TOKEN || '',
   ragApiUrl: process.env.RAG_API_URL || 'http://localhost:8088',

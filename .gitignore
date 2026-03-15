@@ -24,8 +24,12 @@ tools/*/logs
 tools/*/.env
 tools/meta/data/metadata_cache.json
 
-# Claude Code local settings (may contain tokens in permission rules)
+# Claude Code local settings and tooling (not source code)
 .claude/settings.local.json
+.claude/worktrees/
+CLAUDE.md
+GLOBAL_CLAUDE.md
+memory-bank/
 
 # Meta tool config (contains real credentials)
 tools/meta/config/settings.yaml
@@ -35,6 +39,10 @@ tools/meta/config/settings.yaml
 
 # Dev screenshots (loose PNGs in root)
 *.png
+
+# Draft/copy README files
+"README Kopie.md"
+README_CMD.md
 
 # Editor directories and files
 .vscode/*
