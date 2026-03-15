@@ -182,6 +182,10 @@ Documents are scoped to spaces — each space gets its own Qdrant collection. On
 
 Active development. This is a hobby project I work on in my spare time.
 
+## Credits
+
+The RAG backend (`tools/rag-api`) is adapted from [rae2001/paperless-rag](https://github.com/rae2001/paperless-rag), a community project for natural language Q&A over Paperless-NGX documents.
+
 ## License
 
 This project is provided as-is for personal use and inspiration. No license is granted for commercial use.
